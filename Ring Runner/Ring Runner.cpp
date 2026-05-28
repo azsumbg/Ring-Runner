@@ -143,6 +143,7 @@ dirs nature_dir = dirs::stop;
 dll::RANDIT RandIt{};
 
 dll::FIELD* Intro{ nullptr };
+dll::FIELD* Background{ nullptr };
 
 std::vector<dll::FIELD*>vBackgrounds;
 std::vector<dll::FIELD*>vTiles;
@@ -256,6 +257,9 @@ void InitGame()
 	
 	FreeMem(&Intro);
 	Intro = dll::FIELD::create(fields::intro, 0, 0);
+
+	FreeMem(&Background);
+	Background = dll::FIELD::create(fields::background, 0, 50.0f);
 	
 	hero_killed = false;
 	need_left = false;
@@ -278,8 +282,6 @@ void InitGame()
 
 	if (Hero)Hero->Release();
 	Hero = dll::HERO::create(scr_width / 2.0f - 50.0f, ground - 35.0f);
-	
-
 
 }
 
@@ -605,6 +607,7 @@ void CreateResources()
 			bmpLogo = Load(L".\\res\\img\\logo.png", Draw);
 			if (!bmpLogo)
 			{
+				
 				LogErr(L"Error loading bmpLogo");
 				ErrExit(eD2D);
 			}
@@ -926,6 +929,30 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 	CreateResources();
 
+	while (bMsg.message != WM_QUIT)
+	{
+		if ((bRet = PeekMessage(&bMsg, NULL, NULL, NULL, PM_REMOVE)) != 0)
+		{
+			if (bRet == -1)ErrExit(eMsg);
+
+			TranslateMessage(&bMsg);
+			DispatchMessage(&bMsg);
+		}
+
+		if (pause)
+		{
+			if (show_help)continue;
+
+			Draw->BeginDraw();
+			Draw->DrawBitmap(bmpIntro[Intro->get_frame()], Intro->get_rect());
+			if (txtBrush && bigFormat)Draw->DrawTextW(L"ПАУЗА", 6, bigFormat, D2D1::RectF(scr_width / 2.0f - 100.0f,
+				scr_height / 2.0f - 50.0f), txtBrush);
+			Draw->EndDraw();
+			continue;
+		}
+
+
+		//////////////////////////////////////////////////////////////
 
 
 
@@ -934,6 +961,37 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 
 
+
+
+
+		// DRAW THINGS **************************************************
+
+		Draw->BeginDraw();
+		
+		if (txtBrush && inactBrush && hgltBrush && statBrush && nrmFormat && b1BckgBrush && b2BckgBrush && b3BckgBrush)
+		{
+			Draw->FillRectangle(D2D1::RectF(0, 0, scr_width, 50.0f), statBrush);
+			Draw->FillRoundedRectangle(D2D1::RoundedRect(b1Rect, 15.0f, 20.0f), b1BckgBrush);
+			Draw->FillRoundedRectangle(D2D1::RoundedRect(b2Rect, 15.0f, 20.0f), b2BckgBrush);
+			Draw->FillRoundedRectangle(D2D1::RoundedRect(b3Rect, 15.0f, 20.0f), b3BckgBrush);
+
+			if (name_set)Draw->DrawTextW(L"ИМЕ НА ИГРАЧ", 13, nrmFormat, b1TxtRect, inactBrush);
+			else
+			{
+				if (!b1Hglt)Draw->DrawTextW(L"ИМЕ НА ИГРАЧ", 13, nrmFormat, b1TxtRect, txtBrush);
+				else Draw->DrawTextW(L"ИМЕ НА ИГРАЧ", 13, nrmFormat, b1TxtRect, hgltBrush);
+			}
+			if (!b2Hglt)Draw->DrawTextW(L"ЗВУЦИ ON / OFF", 15, nrmFormat, b2TxtRect, txtBrush);
+			else Draw->DrawTextW(L"ЗВУЦИ ON / OFF", 15, nrmFormat, b2TxtRect, hgltBrush);
+			if (!b3Hglt)Draw->DrawTextW(L"ПОМОЩ ЗА ИГРАТА", 16, nrmFormat, b3TxtRect, txtBrush);
+			else Draw->DrawTextW(L"ПОМОЩ ЗА ИГРАТА", 16, nrmFormat, b3TxtRect, hgltBrush);
+		}
+
+
+		/////////////////////////////////////////////////////////////////
+
+		Draw->EndDraw();
+	}
 
 	ReleaseResources();
 	std::remove(tmp_file);
