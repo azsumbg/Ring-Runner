@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="Ring Runner/Ring Runner.vcxproj" Id="d3b69147-81a1-46bf-86a8-8c1b952fff36" />
+</Solution>
