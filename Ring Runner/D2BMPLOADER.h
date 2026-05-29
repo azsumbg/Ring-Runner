@@ -15,7 +15,8 @@
 #pragma comment (lib,"d2d1.lib")
 #pragma comment (lib,"windowscodecs.lib")
 
-extern "C" D2BMPLOADER_API ID2D1Bitmap * Load(LPCWSTR _filename, ID2D1HwndRenderTarget* _render_target);
-extern "C" D2BMPLOADER_API void Release();
+D2BMPLOADER_API void Release();
+D2BMPLOADER_API ID2D1Bitmap* Load(LPCWSTR _filename, ID2D1HwndRenderTarget* _render_target);
+D2BMPLOADER_API ID2D1Bitmap* Load(LPCWSTR _filename, ID2D1HwndRenderTarget* _render_target, HRESULT& err_container);
 
 #endif

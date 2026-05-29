@@ -10,6 +10,7 @@
 #include "ringhelp.h"
 #include <chrono>
 #include <clocale>
+#include <objbase.h>
 
 #pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "d2d1.lib")
@@ -505,6 +506,17 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 
 void CreateResources()
 {
+	int result = 0;
+	CheckFile(Ltmp_file, &result);
+	if (result == FILE_EXIST)ErrExit(eStarted);
+	else
+	{
+		std::wofstream start{ Ltmp_file };
+		start << L"Game_started at: " << std::chrono::system_clock::now();
+		start.close();
+	}
+
+	
 	int win_x{ GetSystemMetrics(SM_CXSCREEN) / 2 - (int)(scr_width / 2.0f) };
 	int win_y = 10;
 
@@ -532,6 +544,8 @@ void CreateResources()
 	if (!bHwnd)ErrExit(eWindow);
 	else
 	{
+		ShowWindow(bHwnd, SW_SHOWDEFAULT);
+
 		HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &iFactory);
 		if (hr != S_OK)
 		{
@@ -550,7 +564,7 @@ void CreateResources()
 				ErrExit(eD2D);
 			}
 		}
-
+		
 		if (Draw)
 		{
 			RECT DPIRect{};
@@ -575,9 +589,9 @@ void CreateResources()
 			ID2D1GradientStopCollection* gColl{ nullptr };
 
 			gStops[0].position = 0;
-			gStops[0].color = D2D1::ColorF(D2D1::ColorF::ColorF::Chocolate);
+			gStops[0].color = D2D1::ColorF(D2D1::ColorF::Chocolate);
 			gStops[1].position = 1.0f;
-			gStops[1].color = D2D1::ColorF(D2D1::ColorF::ColorF::Indigo);
+			gStops[1].color = D2D1::ColorF(D2D1::ColorF::Indigo);
 
 			hr = Draw->CreateGradientStopCollection(gStops, 2, &gColl);
 			if (hr != S_OK)
@@ -604,82 +618,83 @@ void CreateResources()
 				FreeMem(&gColl);
 			}
 
-			bmpLogo = Load(L".\\res\\img\\logo.png", Draw);
+			HRESULT bmp_result{};
+
+			bmpLogo = Load(L".\\res\\img\\logo.png", Draw, bmp_result);
 			if (!bmpLogo)
 			{
-				
 				LogErr(L"Error loading bmpLogo");
 				ErrExit(eD2D);
 			}
-			bmpLoose = Load(L".\\res\\img\\Loose.png", Draw);
+			bmpLoose = Load(L".\\res\\img\\Loose.png", Draw, bmp_result);
 			if (!bmpLoose)
 			{
 				LogErr(L"Error loading bmpLoose");
 				ErrExit(eD2D);
 			}
-			bmpRecord = Load(L".\\res\\img\\Record.png", Draw);
+			bmpRecord = Load(L".\\res\\img\\Record.png", Draw, bmp_result);
 			if (!bmpRecord)
 			{
 				LogErr(L"Error loading bmpRecord");
 				ErrExit(eD2D);
 			}
-			bmpRing = Load(L".\\res\\img\\Ring.png", Draw);
+			bmpRing = Load(L".\\res\\img\\Ring.png", Draw, bmp_result);
 			if (!bmpRing)
 			{
 				LogErr(L"Error loading bmpRing");
 				ErrExit(eD2D);
 			}
-			bmpRIP = Load(L".\\res\\img\\RIP.png", Draw);
+			bmpRIP = Load(L".\\res\\img\\RIP.png", Draw, bmp_result);
 			if (!bmpRIP)
 			{
 				LogErr(L"Error loading bmpRIP");
 				ErrExit(eD2D);
 			}
-			bmpWin = Load(L".\\res\\img\\Win.png", Draw);
+			bmpWin = Load(L".\\res\\img\\Win.png", Draw, bmp_result);
 			if (!bmpWin)
 			{
 				LogErr(L"Error loading bmpWin");
 				ErrExit(eD2D);
 			}
 
-			bmpChest = Load(L".\\res\\img\\assets\\Chest.png", Draw);
+			bmpChest = Load(L".\\res\\img\\assets\\Chest.png", Draw, bmp_result);
 			if (!bmpChest)
 			{
 				LogErr(L"Error loading bmpChest");
 				ErrExit(eD2D);
 			}
-			bmpArmorIcon = Load(L".\\res\\img\\assets\\Armor.png", Draw);
+			bmpArmorIcon = Load(L".\\res\\img\\assets\\Armor.png", Draw, bmp_result);
 			if (!bmpArmorIcon)
 			{
 				LogErr(L"Error loading bmpArmorIcon");
 				ErrExit(eD2D);
 			}
-			bmpPileIcon = Load(L".\\res\\img\\assets\\pile.png", Draw);
+			bmpPileIcon = Load(L".\\res\\img\\assets\\pile.png", Draw, bmp_result);
 			if (!bmpPileIcon)
 			{
 				LogErr(L"Error loading bmpPileIcon");
 				ErrExit(eD2D);
 			}
-			bmpLifeIcon = Load(L".\\res\\img\\assets\\potion.png", Draw);
+			bmpLifeIcon = Load(L".\\res\\img\\assets\\potion.png", Draw, bmp_result);
 			if (!bmpLifeIcon)
 			{
 				LogErr(L"Error loading bmpLifeIcon");
 				ErrExit(eD2D);
 			}
 
-			bmpFlat = Load(L".\\res\\img\\field\\flat.png", Draw);
+			bmpFlat = Load(L".\\res\\img\\field\\flat.png", Draw, bmp_result);
 			if (!bmpFlat)
 			{
 				LogErr(L"Error loading bmpFlat");
 				ErrExit(eD2D);
 			}
-			bmpLeftSlope = Load(L".\\res\\img\\field\\left_slope.png", Draw);
+			bmpLeftSlope = Load(L".\\res\\img\\field\\left_slope.png", Draw, bmp_result);
 			if (!bmpLeftSlope)
 			{
 				LogErr(L"Error loading bmpLeftSlope");
 				ErrExit(eD2D);
 			}
-			bmpRightSlope = Load(L".\\res\\img\\field\\right_slope.png", Draw);
+			bmpRightSlope = Load(L".\\res\\img\\field\\right_slope.png", Draw, bmp_result);
 			if (!bmpRightSlope)
 			{
 				LogErr(L"Error loading bmpRightSlope");
@@ -697,7 +712,7 @@ void CreateResources()
 				wcscat_s(name, add);
 				wcscat_s(name, L".png");
 
-				bmpBackground[i] = Load(name, Draw);
+				bmpBackground[i] = Load(name, Draw, bmp_result);
 				if (!bmpBackground[i])
 				{
 					LogErr(L"Error loading bmpBackground");
@@ -715,7 +730,7 @@ void CreateResources()
 				wcscat_s(name, add);
 				wcscat_s(name, L".png");
 
-				bmpIntro[i] = Load(name, Draw);
+				bmpIntro[i] = Load(name, Draw, bmp_result);
 				if (!bmpIntro[i])
 				{
 					LogErr(L"Error loading bmpIntro");
@@ -733,7 +748,7 @@ void CreateResources()
 				wcscat_s(name, add);
 				wcscat_s(name, L".png");
 
-				bmpPortal[i] = Load(name, Draw);
+				bmpPortal[i] = Load(name, Draw, bmp_result);
 				if (!bmpPortal[i])
 				{
 					LogErr(L"Error loading bmpPortal");
@@ -750,7 +765,7 @@ void CreateResources()
 				wcscat_s(name, add);
 				wcscat_s(name, L".png");
 
-				bmpHeroL[i] = Load(name, Draw);
+				bmpHeroL[i] = Load(name, Draw, bmp_result);
 				if (!bmpHeroL[i])
 				{
 					LogErr(L"Error loading bmpHeroL");
@@ -766,7 +781,7 @@ void CreateResources()
 				wcscat_s(name, add);
 				wcscat_s(name, L".png");
 
-				bmpHeroR[i] = Load(name, Draw);
+				bmpHeroR[i] = Load(name, Draw, bmp_result);
 				if (!bmpHeroR[i])
 				{
 					LogErr(L"Error loading bmpHeroR");
@@ -783,7 +798,7 @@ void CreateResources()
 				wcscat_s(name, add);
 				wcscat_s(name, L".png");
 
-				bmpFemL[i] = Load(name, Draw);
+				bmpFemL[i] = Load(name, Draw, bmp_result);
 				if (!bmpFemL[i])
 				{
 					LogErr(L"Error loading bmpFemL");
@@ -799,7 +814,7 @@ void CreateResources()
 				wcscat_s(name, add);
 				wcscat_s(name, L".png");
 
-				bmpFemR[i] = Load(name, Draw);
+				bmpFemR[i] = Load(name, Draw, bmp_result);
 				if (!bmpFemR[i])
 				{
 					LogErr(L"Error loading bmpFemR");
@@ -816,7 +831,7 @@ void CreateResources()
 				wcscat_s(name, add);
 				wcscat_s(name, L".png");
 
-				bmpMaleL[i] = Load(name, Draw);
+				bmpMaleL[i] = Load(name, Draw, bmp_result);
 				if (!bmpMaleL[i])
 				{
 					LogErr(L"Error loading bmpMaleL");
@@ -832,7 +847,7 @@ void CreateResources()
 				wcscat_s(name, add);
 				wcscat_s(name, L".png");
 
-				bmpMaleR[i] = Load(name, Draw);
+				bmpMaleR[i] = Load(name, Draw, bmp_result);
 				if (!bmpMaleR[i])
 				{
 					LogErr(L"Error loading bmpMaleR");
@@ -849,7 +864,7 @@ void CreateResources()
 				wcscat_s(name, add);
 				wcscat_s(name, L".png");
 
-				bmpFlyerL[i] = Load(name, Draw);
+				bmpFlyerL[i] = Load(name, Draw, bmp_result);
 				if (!bmpFlyerL[i])
 				{
 					LogErr(L"Error loading bmpFlyerL");
@@ -865,7 +880,7 @@ void CreateResources()
 				wcscat_s(name, add);
 				wcscat_s(name, L".png");
 
-				bmpFlyerR[i] = Load(name, Draw);
+				bmpFlyerR[i] = Load(name, Draw, bmp_result);
 				if (!bmpFlyerR[i])
 				{
 					LogErr(L"Error loading bmpFlyerR");
@@ -873,7 +888,7 @@ void CreateResources()
 				}
 			}
 		}
-
+		
 		hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>
 			(&iWriteFactory));
 		if (hr != S_OK)
@@ -897,10 +912,10 @@ void CreateResources()
 			}
 		}
 	}
-
+	
 	PlaySound(L".\\res\\snd\\intro.wav", NULL, SND_ASYNC);
 
-	for (int i = 0; i < 300; ++i)
+	for (int i = 0; i < 240; ++i)
 	{
 		Draw->BeginDraw();
 		Draw->DrawBitmap(bmpIntro[Intro->get_frame()], Intro->get_rect());
@@ -912,7 +927,7 @@ void CreateResources()
 	Draw->DrawBitmap(bmpIntro[Intro->get_frame()], Intro->get_rect());
 	Draw->DrawBitmap(bmpLogo, D2D1::RectF(0, 0, scr_width, scr_height));
 	Draw->EndDraw();
-
+	
 	PlaySound(L".\\res\\snd\\intro.wav", NULL, SND_SYNC);
 }
 
@@ -961,9 +976,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 
 
-
-
-
+		
 		// DRAW THINGS **************************************************
 
 		Draw->BeginDraw();
@@ -987,6 +1000,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			else Draw->DrawTextW(L"ПОМОЩ ЗА ИГРАТА", 16, nrmFormat, b3TxtRect, hgltBrush);
 		}
 
+		if (Background)Draw->DrawBitmap(bmpBackground[Background->get_frame()], D2D1::RectF(0, 50.0f, scr_width, scr_height));
 
 		/////////////////////////////////////////////////////////////////
 
