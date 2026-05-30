@@ -146,7 +146,7 @@ dll::RANDIT RandIt{};
 dll::FIELD* Intro{ nullptr };
 dll::FIELD* Background{ nullptr };
 
-std::vector<dll::FIELD*>vBackgrounds;
+std::vector<dll::FIELD*>vMainGround;
 std::vector<dll::FIELD*>vTiles;
 
 dll::HERO* Hero{ nullptr };
@@ -268,18 +268,18 @@ void InitGame()
 
 	nature_dir = dirs::stop;
 	
-	if (!vBackgrounds.empty())
-		for (int i = 0; i < vBackgrounds.size(); ++i)
-			if (!FreeMem(&vBackgrounds[i]))LogErr(L"Error releasing vBackgrounds !");
-	vBackgrounds.clear();
-
-	for (float sx = -scr_width; sx < 2.0f * scr_width; ++sx)vBackgrounds.push_back(dll::FIELD::create(fields::background, 
-		sx, 50.0f));
-
 	if (!vTiles.empty())
 		for (int i = 0; i < vTiles.size(); ++i)
 			if (!FreeMem(&vTiles[i]))LogErr(L"Error releasing vTiles !");
 	vTiles.clear();
+
+
+	if (!vMainGround.empty())
+		for (int i = 0; i < vMainGround.size(); ++i)
+			if (!FreeMem(&vMainGround[i]))LogErr(L"Error releasing vMainGround !");
+	vMainGround.clear();
+	for (float sx = -scr_width; sx < 2.0f * scr_width; sx += 100.0f)
+		vMainGround.push_back(dll::FIELD::create(fields::flat_ground, sx, ground));
 
 	if (Hero)Hero->Release();
 	Hero = dll::HERO::create(scr_width / 2.0f - 50.0f, ground - 35.0f);
@@ -369,7 +369,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 		EndPaint(hwnd, &bPaint);
 		break;
 
-	case WM_SETICON:
+	case WM_SETCURSOR:
 		GetCursorPos(&cur_pos);
 		ScreenToClient(hwnd, &cur_pos);
 		if (LOWORD(lParam) == HTCLIENT)
@@ -386,7 +386,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 				{
 					if (!b1Hglt)
 					{
-						if (sound)mciSendString(L"play .\\res\\snd\\exclamation.wav", NULL, NULL, NULL);
+						if (sound)mciSendString(L"play .\\res\\snd\\click.wav", NULL, NULL, NULL);
 						b1Hglt = true;
 						b2Hglt = false;
 						b3Hglt = false;
@@ -396,7 +396,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 				{
 					if (!b2Hglt)
 					{
-						if (sound)mciSendString(L"play .\\res\\snd\\exclamation.wav", NULL, NULL, NULL);
+						if (sound)mciSendString(L"play .\\res\\snd\\click.wav", NULL, NULL, NULL);
 						b1Hglt = false;
 						b2Hglt = true;
 						b3Hglt = false;
@@ -406,7 +406,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 				{
 					if (!b3Hglt)
 					{
-						if (sound)mciSendString(L"play .\\res\\snd\\exclamation.wav", NULL, NULL, NULL);
+						if (sound)mciSendString(L"play .\\res\\snd\\click.wav", NULL, NULL, NULL);
 						b1Hglt = false;
 						b2Hglt = false;
 						b3Hglt = true;
@@ -414,7 +414,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 				}
 				else if (b1Hglt || b2Hglt || b3Hglt)
 				{
-					if (sound)mciSendString(L"play .\\res\\snd\\exclamation.wav", NULL, NULL, NULL);
+					if (sound)mciSendString(L"play .\\res\\snd\\click.wav", NULL, NULL, NULL);
 					b1Hglt = false;
 					b2Hglt = false;
 					b3Hglt = false;
@@ -425,7 +425,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 			}
 			else if (b1Hglt || b2Hglt || b3Hglt)
 			{
-				if (sound)mciSendString(L"play .\\res\\snd\\exclamation.wav", NULL, NULL, NULL);
+				if (sound)mciSendString(L"play .\\res\\snd\\click.wav", NULL, NULL, NULL);
 				b1Hglt = false;
 				b2Hglt = false;
 				b3Hglt = false;
@@ -445,7 +445,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 
 			if (b1Hglt || b2Hglt || b3Hglt)
 			{
-				if (sound)mciSendString(L"play .\\res\\snd\\exclamation.wav", NULL, NULL, NULL);
+				if (sound)mciSendString(L"play .\\res\\snd\\click.wav", NULL, NULL, NULL);
 				b1Hglt = false;
 				b2Hglt = false;
 				b3Hglt = false;
@@ -457,6 +457,25 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 		}
 		break;
 
+	case WM_KEYDOWN:
+		if (Hero)
+		{
+			switch (LOWORD(wParam))
+			{
+			case VK_LEFT:
+				Hero->dir = dirs::left;
+				break;
+
+			case VK_RIGHT:
+				Hero->dir = dirs::right;
+				break;
+
+			case VK_DOWN:
+				Hero->dir = dirs::stop;
+				break;
+			}
+		}
+		break;
 
 	case WM_COMMAND:
 		switch (LOWORD(wParam))
@@ -928,7 +947,7 @@ void CreateResources()
 	Draw->DrawBitmap(bmpLogo, D2D1::RectF(0, 0, scr_width, scr_height));
 	Draw->EndDraw();
 	
-	PlaySound(L".\\res\\snd\\intro.wav", NULL, SND_SYNC);
+	PlaySound(L".\\res\\snd\\boom.wav", NULL, SND_SYNC);
 }
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nCmdShow)
@@ -961,7 +980,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			Draw->BeginDraw();
 			Draw->DrawBitmap(bmpIntro[Intro->get_frame()], Intro->get_rect());
 			if (txtBrush && bigFormat)Draw->DrawTextW(L"ПАУЗА", 6, bigFormat, D2D1::RectF(scr_width / 2.0f - 100.0f,
-				scr_height / 2.0f - 50.0f), txtBrush);
+				scr_height / 2.0f - 50.0f, scr_width, scr_height), txtBrush);
 			Draw->EndDraw();
 			continue;
 		}
@@ -969,11 +988,62 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 		//////////////////////////////////////////////////////////////
 
+		if (Hero)
+		{
+			switch (Hero->dir)
+			{
+			case dirs::right:
+				nature_dir = dirs::left;
+				break;
 
+			case dirs::left:
+				nature_dir = dirs::right;
+				break;
 
+			default: nature_dir = dirs::stop;
+			}
+		}
 
+		if (!vMainGround.empty())
+		{
+			for (std::vector<dll::FIELD*>::iterator tile = vMainGround.begin(); tile < vMainGround.end(); ++tile)
+			{
+				switch (nature_dir)
+				{
+				case dirs::left:
+					if (!(*tile)->move(speed, nature_dir))
+					{
+						(*tile)->Release();
+						vMainGround.erase(tile);
+						need_right = true;
+						break;
+					}
+					break;
 
+				case dirs::right:
+					if (!(*tile)->move(speed, nature_dir))
+					{
+						(*tile)->Release();
+						vMainGround.erase(tile);
+						need_left = true;
+						break;
+					}
+					break;
+				}
 
+				if (need_left || need_right)break;
+			}
+		}
+		if (need_left)
+		{
+			need_left = false;
+			vMainGround.push_back(dll::FIELD::create(fields::flat_ground, -scr_width, ground));
+		}
+		if (need_right)
+		{
+			need_right = false;
+			vMainGround.push_back(dll::FIELD::create(fields::flat_ground, 2.0f * scr_width - 100.0f, ground));
+		}
 
 
 		
@@ -1001,6 +1071,53 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		}
 
 		if (Background)Draw->DrawBitmap(bmpBackground[Background->get_frame()], D2D1::RectF(0, 50.0f, scr_width, scr_height));
+
+		if (!vMainGround.empty())
+		{
+			for (int i = 0; i < vMainGround.size(); ++i)Draw->DrawBitmap(bmpFlat, vMainGround[i]->get_rect());
+		}
+		
+		if (!vTiles.empty())
+		{
+			for (int i = 0; i < vTiles.size(); ++i)
+			{
+				switch (vTiles[i]->type)
+				{
+				case fields::flat_ground:
+					Draw->DrawBitmap(bmpFlat, vTiles[i]->get_rect());
+					break;
+
+				case fields::right_slope:
+					Draw->DrawBitmap(bmpRightSlope, vTiles[i]->get_rect());
+					break;
+
+				case fields::left_slope:
+					Draw->DrawBitmap(bmpRightSlope, vTiles[i]->get_rect());
+					break;
+				}
+			}
+		}
+
+		if (Hero)
+		{
+			if (Hero->dir == dirs::left)
+			{
+				int aframe = Hero->get_frame();
+				Draw->DrawBitmap(bmpHeroL[aframe], Resizer(bmpHeroL[aframe], Hero->start.x, Hero->start.y));
+			}
+			else if (Hero->dir == dirs::right)
+			{
+				int aframe = Hero->get_frame();
+				Draw->DrawBitmap(bmpHeroR[aframe], Resizer(bmpHeroR[aframe], Hero->start.x, Hero->start.y));
+			}
+			else Draw->DrawBitmap(bmpHeroR[0], Resizer(bmpHeroR[0], Hero->start.x, Hero->start.y));
+		}
+
+
+
+
+
+
 
 		/////////////////////////////////////////////////////////////////
 

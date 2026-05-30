@@ -15,7 +15,7 @@ constexpr float scr_width{ 1000.0f };
 constexpr float scr_height{ 800.0f };
 
 constexpr float sky{ 50.0f };
-constexpr float ground{ 100.0f };
+constexpr float ground{ 700.0f };
 
 constexpr float max_jump{ 100.0f };
 
