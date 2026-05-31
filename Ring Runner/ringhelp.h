@@ -534,6 +534,7 @@ namespace dll
 
 		bool in_jump = false;
 		bool jump_up = false;
+		float x_modifier{};
 
 		HERO(float s_x, float s_y);
 

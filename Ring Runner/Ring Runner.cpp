@@ -464,13 +464,16 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 			{
 			case VK_LEFT:
 				Hero->dir = dirs::left;
+				Hero->action = actions::run;
 				break;
 
 			case VK_RIGHT:
 				Hero->dir = dirs::right;
+				Hero->action = actions::run;
 				break;
 
 			case VK_DOWN:
+				Hero->action = actions::stop;
 				Hero->dir = dirs::stop;
 				break;
 			}
@@ -1034,16 +1037,98 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				if (need_left || need_right)break;
 			}
 		}
-		if (need_left)
+		if (!vMainGround.empty())
 		{
-			need_left = false;
-			vMainGround.push_back(dll::FIELD::create(fields::flat_ground, -scr_width, ground));
+			if (need_left)
+			{
+				need_left = false;
+				vMainGround.insert(vMainGround.begin(),
+					dll::FIELD::create(fields::flat_ground, (*vMainGround.begin())->start.x - 100.0f, ground));
+
+			}
+			if (need_right)
+			{
+				need_right = false;
+				vMainGround.push_back(dll::FIELD::create(fields::flat_ground, vMainGround.back()->start.x + 100.0f, ground));
+			}
 		}
-		if (need_right)
+
+		// vTiles ********************************************
+
+		if (vTiles.size() < 10 && RandIt(0, 100) == 66)
 		{
-			need_right = false;
-			vMainGround.push_back(dll::FIELD::create(fields::flat_ground, 2.0f * scr_width - 100.0f, ground));
+			
+			float sx = scr_width + RandIt(300.0f, 2.0f * scr_width);
+			float sy = ground - 100.0f;
+
+			D2D1_RECT_F dummy{ sx, sy, sx + 100.0f, sy + 100.0f };
+
+			bool ok = true;
+
+			if (!vTiles.empty())
+			{
+				for (int i = 0; i < vTiles.size(); ++i)
+				{
+					if (dll::intersect(dummy, vTiles[i]->get_rect()))
+					{
+						ok = false;
+						break;
+					}
+				}
+			}
+
+			if (ok)
+			{
+				vTiles.push_back(dll::FIELD::create(fields::left_slope, sx, sy));
+				sx += 100.0f;
+				if (RandIt(0, 3) == 2)
+				{
+					vTiles.push_back(dll::FIELD::create(fields::flat_ground, sx, sy));
+					sx += 100.0f;
+				}
+				vTiles.push_back(dll::FIELD::create(fields::right_slope, sx, sy));
+			}
 		}
+		if (!vTiles.empty())
+		{
+			for (std::vector<dll::FIELD*>::iterator tile = vTiles.begin(); tile < vTiles.end(); ++tile)
+			{
+				if (!(*tile)->move(speed, nature_dir))
+				{
+					(*tile)->Release();
+					vTiles.erase(tile);
+					break;
+				}
+			}
+		}
+
+		if (Hero && !vTiles.empty())
+		{
+			for (int i = 0; i < vTiles.size(); ++i)
+			{
+				if (dll::intersect(Hero->get_rect(), vTiles[i]->get_rect())
+					|| (Hero->action == actions::climb_down && Hero->end.x < ground))
+				{
+					if (vTiles[i]->type == fields::flat_ground)break;
+
+					Hero->climb(speed, vTiles[i]->get_rect(), vTiles[i]->type);
+					
+					if (Hero->action == actions::run)
+					{
+						Hero->start.y += 1.0f;
+						Hero->set_edges();
+					}
+
+					break;
+				}
+			
+			}
+		}
+
+		///////////////////////////////////////////////////////
+
+
+
 
 
 		
@@ -1092,7 +1177,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 					break;
 
 				case fields::left_slope:
-					Draw->DrawBitmap(bmpRightSlope, vTiles[i]->get_rect());
+					Draw->DrawBitmap(bmpLeftSlope, vTiles[i]->get_rect());
 					break;
 				}
 			}
