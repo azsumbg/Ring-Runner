@@ -151,7 +151,7 @@ std::vector<dll::FIELD*>vTiles;
 
 dll::HERO* Hero{ nullptr };
 
-
+std::vector<dll::EVIL*> vEvils;
 
 
 /////////////////////////////////////////////////////////////////
@@ -273,7 +273,6 @@ void InitGame()
 			if (!FreeMem(&vTiles[i]))LogErr(L"Error releasing vTiles !");
 	vTiles.clear();
 
-
 	if (!vMainGround.empty())
 		for (int i = 0; i < vMainGround.size(); ++i)
 			if (!FreeMem(&vMainGround[i]))LogErr(L"Error releasing vMainGround !");
@@ -284,6 +283,10 @@ void InitGame()
 	if (Hero)Hero->Release();
 	Hero = dll::HERO::create(scr_width / 2.0f - 50.0f, ground - 35.0f);
 
+	if (!vEvils.empty())
+		for (int i = 0; i < vEvils.size(); ++i)
+			if (!FreeMem(&vEvils[i]))LogErr(L"Error releasing vEvils !");
+	vEvils.clear();
 }
 
 INT_PTR CALLBACK DlgProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lParam)
@@ -475,6 +478,24 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 			case VK_DOWN:
 				Hero->action = actions::stop;
 				Hero->dir = dirs::stop;
+				break;
+
+			case VK_UP:
+				if (Hero->action != actions::jump)
+				{
+					dll::BAG<D2D1_RECT_F> bGrounds;
+					
+					if (!vMainGround.empty())
+					{
+						for (int i = 0; i < vMainGround.size(); ++i) bGrounds.push_back(vMainGround[i]->get_rect());
+					}
+					if (!vTiles.empty())
+					{
+						for (int i = 0; i < vTiles.size(); ++i) bGrounds.push_back(vTiles[i]->get_rect());
+					}
+
+					Hero->jump(bGrounds);
+				}
 				break;
 			}
 		}
@@ -1056,19 +1077,22 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		// vTiles ********************************************
 
 		if (vTiles.size() < 10 && RandIt(0, 100) == 66)
-		{	
+		{
 			float sx = scr_width + RandIt(0.0f, scr_width);
 			float sy = ground - 100.0f;
 
 			D2D1_RECT_F dummy{ sx, sy, sx + 300.0f, sy + 100.0f };
 
 			bool ok = true;
-
 			if (!vTiles.empty())
 			{
 				for (int i = 0; i < vTiles.size(); ++i)
 				{
-					if (dll::intersect(dummy, vTiles[i]->get_rect()))ok = false;
+					if (dll::intersect(vTiles[i]->get_rect(), dummy))
+					{
+						ok = false;
+						break;
+					}
 				}
 			}
 
@@ -1097,7 +1121,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
-		if (Hero && !vTiles.empty())
+		if (Hero && !vTiles.empty() && Hero->action != actions::jump)
 		{
 			bool on_hill = false;
 
@@ -1138,9 +1162,61 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
+		if (Hero)
+		{
+			if (Hero->action == actions::jump)
+			{
+				dll::BAG<D2D1_RECT_F> bGrounds;
+
+				if (!vMainGround.empty())
+				{
+					for (int i = 0; i < vMainGround.size(); ++i) bGrounds.push_back(vMainGround[i]->get_rect());
+				}
+				if (!vTiles.empty())
+				{
+					for (int i = 0; i < vTiles.size(); ++i) bGrounds.push_back(vTiles[i]->get_rect());
+				}
+
+				Hero->jump(bGrounds);
+			}
+		}
+
 		///////////////////////////////////////////////////////
 
+		// vEvils *********************************************
 
+		if (vEvils.size() < 5 + speed && RandIt(0, 200) == 66)
+		{
+			creatures type = static_cast<creatures>(RandIt(0, 2));
+			
+			if (type != creatures::zombie_flyer)vEvils.push_back(dll::EVIL::create(type, scr_width + RandIt(20.0f, 100.0f),
+				ground - 35.0f));
+			else
+				vEvils.push_back(dll::EVIL::create(type, scr_width + RandIt(20.0f, 100.0f),
+					scr_height / 2.0f + RandIt(20.0f, 100.0f)));
+		}
+
+		if (!vEvils.empty())
+		{
+			for (std::vector<dll::EVIL*>::iterator evil = vEvils.begin(); evil < vEvils.end(); ++evil)
+			{
+				dll::BAG<dll::FIELD*> bGrounds;
+
+				if (!vTiles.empty())
+				{
+					for (int i = 0; i < vTiles.size(); ++i) bGrounds.push_back(vTiles[i]);
+				}
+
+				if (!(*evil)->move(speed, bGrounds))
+				{
+					(*evil)->Release();
+					vEvils.erase(evil);
+					break;
+				}
+			}
+		}
+
+		////////////////////////////////////////////////////////
 
 
 
@@ -1219,7 +1295,34 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			Draw->SetTransform(D2D1::Matrix3x2F::Rotation(0.0f, Hero->center));
 		}
 
+		if (!vEvils.empty())
+		{
+			for (int i = 0; i < vEvils.size(); ++i)
+			{
+				int frame = vEvils[i]->get_frame();
 
+				switch (vEvils[i]->type)
+				{
+				case creatures::zombie_girl:
+					if (vEvils[i]->dir == dirs::left)Draw->DrawBitmap(bmpFemL[frame], Resizer(bmpFemL[frame],
+						vEvils[i]->start.x, vEvils[i]->start.y));
+					else Draw->DrawBitmap(bmpFemR[frame], Resizer(bmpFemR[frame], vEvils[i]->start.x, vEvils[i]->start.y));
+					break;
+
+				case creatures::zombie_boy:
+					if (vEvils[i]->dir == dirs::left)Draw->DrawBitmap(bmpMaleL[frame], Resizer(bmpMaleL[frame],
+						vEvils[i]->start.x, vEvils[i]->start.y));
+					else Draw->DrawBitmap(bmpMaleR[frame], Resizer(bmpMaleR[frame], vEvils[i]->start.x, vEvils[i]->start.y));
+					break;
+
+				case creatures::zombie_flyer:
+					if (vEvils[i]->dir == dirs::left)Draw->DrawBitmap(bmpFlyerL[frame], Resizer(bmpFlyerL[frame],
+						vEvils[i]->start.x, vEvils[i]->start.y));
+					else Draw->DrawBitmap(bmpFlyerR[frame], Resizer(bmpFlyerR[frame], vEvils[i]->start.x, vEvils[i]->start.y));
+					break;
+				}
+			}
+		}
 
 
 

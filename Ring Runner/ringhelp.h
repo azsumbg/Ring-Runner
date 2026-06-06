@@ -17,7 +17,7 @@ constexpr float scr_height{ 800.0f };
 constexpr float sky{ 50.0f };
 constexpr float ground{ 700.0f };
 
-constexpr float max_jump{ 100.0f };
+constexpr float max_jump{ 50.0f };
 
 constexpr int EX_PTR{ 6001 };
 constexpr int EX_INDEX{ 6002 };
@@ -581,7 +581,7 @@ namespace dll
 		int damage = 5;
 		int armor = 1;
 
-		bool move(float gear, BAG<FIELD>& grounds);
+		bool move(float gear, BAG<FIELD*>& grounds);
 
 		int attack();
 
