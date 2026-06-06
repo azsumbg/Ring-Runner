@@ -1239,13 +1239,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		{
 			for (int i = 0; i < vEvils.size(); ++i)
 			{
-				int damage = vEvils[i]->damage;
+				int damage = vEvils[i]->attack(Hero->center);
 
 				if (damage > 0)
 				{
 					vEvilShots.push_back(dll::SHOT::create(vEvils[i]->center.x, vEvils[i]->center.y,
 						Hero->center.x, Hero->center.y));
 					vEvilShots.back()->damage = damage;
+					break;
 				}
 			}
 		}
@@ -1343,8 +1344,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			{
 				Draw->DrawLine(D2D1::Point2F(Hero->start.x - 8.0f, Hero->start.y),
 					D2D1::Point2F(Hero->start.x - 8.0f, Hero->start.y + 25.0f), inactBrush, 5.0f);
-				Draw->DrawLine(D2D1::Point2F(Hero->start.x - 7.0f, Hero->start.y),
-					D2D1::Point2F(Hero->start.x - 7.0f, Hero->start.y + Hero->lifes / 4.0f), txtBrush, 3.0f);
+				Draw->DrawLine(D2D1::Point2F(Hero->start.x - 8.0f, Hero->start.y),
+					D2D1::Point2F(Hero->start.x - 8.0f, Hero->start.y + Hero->lifes / 4.0f), txtBrush, 3.0f);
 			}
 			Draw->SetTransform(D2D1::Matrix3x2F::Rotation(0.0f, Hero->center));
 		}

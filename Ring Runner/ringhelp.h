@@ -568,6 +568,8 @@ namespace dll
 		int frame_delay = 12;
 		int max_frame_delay = 12;
 
+		float sight_range{ 0 };
+
 		int attack_delay{ 0 };
 		int max_attack_delay{ 0 };
 
@@ -584,7 +586,7 @@ namespace dll
 
 		bool move(float gear, BAG<FIELD*>& grounds);
 
-		int attack();
+		int attack(D2D1_POINT_2F hero_center);
 
 		int get_frame();
 
