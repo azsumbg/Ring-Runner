@@ -88,6 +88,7 @@ ID2D1Bitmap* bmpLogo{ nullptr };
 ID2D1Bitmap* bmpLoose{ nullptr };
 ID2D1Bitmap* bmpRecord{ nullptr };
 ID2D1Bitmap* bmpRing{ nullptr };
+ID2D1Bitmap* bmpSpit{ nullptr };
 ID2D1Bitmap* bmpWin{ nullptr };
 ID2D1Bitmap* bmpRIP{ nullptr };
 
@@ -153,6 +154,9 @@ dll::HERO* Hero{ nullptr };
 
 std::vector<dll::EVIL*> vEvils;
 
+std::vector<dll::SHOT*> vEvilShots;
+std::vector<dll::SHOT*> vHeroShots;
+
 
 /////////////////////////////////////////////////////////////////
 
@@ -199,6 +203,8 @@ void ReleaseResources()
 	if (!FreeMem(&bmpLogo))LogErr(L"Error releasing D2D1 main write bmpLogo !");
 	if (!FreeMem(&bmpLoose))LogErr(L"Error releasing D2D1 main write bmpLoose !");
 	if (!FreeMem(&bmpRecord))LogErr(L"Error releasing D2D1 main write bmpRecord !");
+	if (!FreeMem(&bmpRing))LogErr(L"Error releasing D2D1 main write bmpRing !");
+	if (!FreeMem(&bmpSpit))LogErr(L"Error releasing D2D1 main write bmpSpit !");
 	if (!FreeMem(&bmpWin))LogErr(L"Error releasing D2D1 main write bmpWin !");
 	if (!FreeMem(&bmpRIP))LogErr(L"Error releasing D2D1 main write bmpRIP !");
 
@@ -287,6 +293,16 @@ void InitGame()
 		for (int i = 0; i < vEvils.size(); ++i)
 			if (!FreeMem(&vEvils[i]))LogErr(L"Error releasing vEvils !");
 	vEvils.clear();
+
+	if (!vEvilShots.empty())
+		for (int i = 0; i < vEvilShots.size(); ++i)
+			if (!FreeMem(&vEvilShots[i]))LogErr(L"Error releasing vEvilShots !");
+	vEvilShots.clear();
+
+	if (!vHeroShots.empty())
+		for (int i = 0; i < vHeroShots.size(); ++i)
+			if (!FreeMem(&vHeroShots[i]))LogErr(L"Error releasing vHeroShots !");
+	vHeroShots.clear();
 }
 
 INT_PTR CALLBACK DlgProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lParam)
@@ -538,9 +554,6 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 		break;
 
 
-
-
-
 	default: return DefWindowProc(hwnd, ReceivedMsg, wParam, lParam);
 	}
 
@@ -685,6 +698,12 @@ void CreateResources()
 			if (!bmpRing)
 			{
 				LogErr(L"Error loading bmpRing");
+				ErrExit(eD2D);
+			}
+			bmpSpit = Load(L".\\res\\img\\spit.png", Draw, bmp_result);
+			if (!bmpSpit)
+			{
+				LogErr(L"Error loading bmpSpit");
 				ErrExit(eD2D);
 			}
 			bmpRIP = Load(L".\\res\\img\\RIP.png", Draw, bmp_result);
@@ -1216,6 +1235,34 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
+		if (!vEvils.empty() && Hero)
+		{
+			for (int i = 0; i < vEvils.size(); ++i)
+			{
+				int damage = vEvils[i]->damage;
+
+				if (damage > 0)
+				{
+					vEvilShots.push_back(dll::SHOT::create(vEvils[i]->center.x, vEvils[i]->center.y,
+						Hero->center.x, Hero->center.y));
+					vEvilShots.back()->damage = damage;
+				}
+			}
+		}
+
+		if (!vEvilShots.empty())
+		{
+			for (std::vector<dll::SHOT*>::iterator shot = vEvilShots.begin(); shot < vEvilShots.end(); ++shot)
+			{
+				if (!(*shot)->move(speed))
+				{
+					(*shot)->Release();
+					vEvilShots.erase(shot);
+					break;
+				}
+			}
+		}
+
 		////////////////////////////////////////////////////////
 
 
@@ -1291,7 +1338,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				Draw->DrawBitmap(bmpHeroR[aframe], Resizer(bmpHeroR[aframe], Hero->start.x, Hero->start.y));
 			}
 			else Draw->DrawBitmap(bmpHeroR[0], Resizer(bmpHeroR[0], Hero->start.x, Hero->start.y));
-			
+
+			if (inactBrush && txtBrush)
+			{
+				Draw->DrawLine(D2D1::Point2F(Hero->start.x - 8.0f, Hero->start.y),
+					D2D1::Point2F(Hero->start.x - 8.0f, Hero->start.y + 25.0f), inactBrush, 5.0f);
+				Draw->DrawLine(D2D1::Point2F(Hero->start.x - 7.0f, Hero->start.y),
+					D2D1::Point2F(Hero->start.x - 7.0f, Hero->start.y + Hero->lifes / 4.0f), txtBrush, 3.0f);
+			}
 			Draw->SetTransform(D2D1::Matrix3x2F::Rotation(0.0f, Hero->center));
 		}
 
@@ -1324,8 +1378,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
-
-
+		if (!vEvilShots.empty())
+		{
+			for (int i = 0; i < vEvilShots.size(); ++i)Draw->DrawBitmap(bmpSpit, vEvilShots[i]->get_rect());
+		}
+		if (!vHeroShots.empty())
+		{
+			for (int i = 0; i < vHeroShots.size(); ++i)Draw->DrawBitmap(bmpSpit, vHeroShots[i]->get_rect());
+		}
 
 
 		/////////////////////////////////////////////////////////////////

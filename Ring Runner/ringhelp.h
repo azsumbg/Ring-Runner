@@ -30,6 +30,7 @@ enum class actions { run = 0, climb_up = 1, climb_down = 2, stop = 3, fall = 4, 
 enum class creatures { zombie_girl = 0, zombie_boy = 1, zombie_flyer = 2, hero = 3 };
 enum class fields { flat_ground = 0, left_slope = 1, right_slope = 2, background = 3, intro = 4, portal = 5 };
 enum class assets { rings = 0, armor = 1, potion = 2 };
+enum class shots { ring_shot = 0, spit_shot = 0 };
 
 struct RINGHELP_API FADING
 {
@@ -590,6 +591,23 @@ namespace dll
 		void Release();
 
 		static EVIL* create(creatures what_type, float sx, float sy);
+	};
+
+	class RINGHELP_API SHOT :public PROTON
+	{
+	private:
+		float _speed = 5.0f;
+
+		SHOT(float _sx, float _sy, float _ex, float _ey);
+
+	public:
+		int damage = 0;
+
+		bool move(float gear);
+
+		void Release();
+
+		static SHOT* create(float sx, float sy, float ex, float ey);
 	};
 
 	// FUNCTIONS **********************************************
