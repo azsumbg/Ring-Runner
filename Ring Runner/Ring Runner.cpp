@@ -1100,10 +1100,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		if (Hero && !vTiles.empty())
 		{
 			bool on_hill = false;
+
 			for (int i = 0; i < vTiles.size(); ++i)
 			{
-				if (dll::intersect(Hero->get_rect(), vTiles[i]->get_rect())
-					|| (Hero->action == actions::climb_down && Hero->end.y < ground))
+				if (dll::intersect(Hero->get_rect(), vTiles[i]->get_rect()))
 				{
 					if (vTiles[i]->type == fields::flat_ground)break;
 
