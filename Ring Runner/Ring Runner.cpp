@@ -1056,12 +1056,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		// vTiles ********************************************
 
 		if (vTiles.size() < 10 && RandIt(0, 100) == 66)
-		{
-			
-			float sx = scr_width + RandIt(300.0f, 2.0f * scr_width);
+		{	
+			float sx = scr_width + RandIt(0.0f, scr_width);
 			float sy = ground - 100.0f;
 
-			D2D1_RECT_F dummy{ sx, sy, sx + 100.0f, sy + 100.0f };
+			D2D1_RECT_F dummy{ sx, sy, sx + 300.0f, sy + 100.0f };
 
 			bool ok = true;
 
@@ -1069,11 +1068,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			{
 				for (int i = 0; i < vTiles.size(); ++i)
 				{
-					if (dll::intersect(dummy, vTiles[i]->get_rect()))
-					{
-						ok = false;
-						break;
-					}
+					if (dll::intersect(dummy, vTiles[i]->get_rect()))ok = false;
 				}
 			}
 
@@ -1104,10 +1099,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 		if (Hero && !vTiles.empty())
 		{
+			bool on_hill = false;
 			for (int i = 0; i < vTiles.size(); ++i)
 			{
 				if (dll::intersect(Hero->get_rect(), vTiles[i]->get_rect())
-					|| (Hero->action == actions::climb_down && Hero->end.x < ground))
+					|| (Hero->action == actions::climb_down && Hero->end.y < ground))
 				{
 					if (vTiles[i]->type == fields::flat_ground)break;
 
@@ -1119,9 +1115,26 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 						Hero->set_edges();
 					}
 
+					on_hill = true;
+
 					break;
 				}
-			
+			}
+
+			if (!on_hill && Hero->end.y < ground)
+			{
+				dll::BAG<D2D1_RECT_F> bGrounds;
+
+				if (!vMainGround.empty())
+				{
+					for (int i = 0; i < vMainGround.size(); ++i) bGrounds.push_back(vMainGround[i]->get_rect());
+				}
+				if (!vTiles.empty())
+				{
+					for (int i = 0; i < vTiles.size(); ++i) bGrounds.push_back(vTiles[i]->get_rect());
+				}
+				
+				Hero->fall(bGrounds);
 			}
 		}
 
@@ -1185,6 +1198,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 		if (Hero)
 		{
+			Draw->SetTransform(D2D1::Matrix3x2F::Rotation(0.0f, Hero->center));
+
+			if (Hero->action == actions::climb_up)Draw->SetTransform(D2D1::Matrix3x2F::Rotation(-45.0f, Hero->center));
+			else if (Hero->action == actions::climb_down)Draw->SetTransform(D2D1::Matrix3x2F::Rotation(45.0f, Hero->center));
+
+
 			if (Hero->dir == dirs::left)
 			{
 				int aframe = Hero->get_frame();
@@ -1196,6 +1215,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				Draw->DrawBitmap(bmpHeroR[aframe], Resizer(bmpHeroR[aframe], Hero->start.x, Hero->start.y));
 			}
 			else Draw->DrawBitmap(bmpHeroR[0], Resizer(bmpHeroR[0], Hero->start.x, Hero->start.y));
+			
+			Draw->SetTransform(D2D1::Matrix3x2F::Rotation(0.0f, Hero->center));
 		}
 
 
