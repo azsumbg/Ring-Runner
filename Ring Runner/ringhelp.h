@@ -584,7 +584,7 @@ namespace dll
 		int damage = 5;
 		int armor = 1;
 
-		bool move(float gear, BAG<FIELD*>& grounds);
+		bool move(float gear, BAG<FIELD*>& grounds, dirs nature_dir);
 
 		int attack(D2D1_POINT_2F hero_center);
 

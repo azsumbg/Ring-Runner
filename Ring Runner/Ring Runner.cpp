@@ -59,6 +59,8 @@ POINT cur_pos{};
 float x_scale{ 0 };
 float y_scale{ 0 };
 
+UINT bTimer{ 0 };
+
 D2D1_RECT_F b1Rect{ 50.0f, 10.0f, scr_width / 3.0f - 50.0f, 40.0f };
 D2D1_RECT_F b2Rect{ scr_width / 3.0f + 50.0f, 10.0f, scr_width * 2.0f / 3.0f - 50.0f, 40.0f };
 D2D1_RECT_F b3Rect{ scr_width * 2.0f / 3.0f + 50.0f, 10.0f, scr_width - 50.0f, 40.0f };
@@ -88,6 +90,7 @@ ID2D1Bitmap* bmpLogo{ nullptr };
 ID2D1Bitmap* bmpLoose{ nullptr };
 ID2D1Bitmap* bmpRecord{ nullptr };
 ID2D1Bitmap* bmpRing{ nullptr };
+ID2D1Bitmap* bmpSmallRing{ nullptr };
 ID2D1Bitmap* bmpSpit{ nullptr };
 ID2D1Bitmap* bmpWin{ nullptr };
 ID2D1Bitmap* bmpRIP{ nullptr };
@@ -128,11 +131,13 @@ bool b2Hglt = false;
 bool b3Hglt = false;
 
 bool hero_killed = false;
+D2D1_RECT_F RipRect{};
 
 bool name_set = false;
 wchar_t current_player[16]{ L"TARLYO" };
 
 float speed = 1.0f;
+float distance = 240.0f;
 int score = 0;
 
 bool need_left = false;
@@ -156,7 +161,7 @@ std::vector<dll::EVIL*> vEvils;
 
 std::vector<dll::SHOT*> vEvilShots;
 std::vector<dll::SHOT*> vHeroShots;
-
+std::vector<dll::PROTON*>vRings;
 
 /////////////////////////////////////////////////////////////////
 
@@ -204,6 +209,7 @@ void ReleaseResources()
 	if (!FreeMem(&bmpLoose))LogErr(L"Error releasing D2D1 main write bmpLoose !");
 	if (!FreeMem(&bmpRecord))LogErr(L"Error releasing D2D1 main write bmpRecord !");
 	if (!FreeMem(&bmpRing))LogErr(L"Error releasing D2D1 main write bmpRing !");
+	if (!FreeMem(&bmpSmallRing))LogErr(L"Error releasing D2D1 main write bmpSmallRing !");
 	if (!FreeMem(&bmpSpit))LogErr(L"Error releasing D2D1 main write bmpSpit !");
 	if (!FreeMem(&bmpWin))LogErr(L"Error releasing D2D1 main write bmpWin !");
 	if (!FreeMem(&bmpRIP))LogErr(L"Error releasing D2D1 main write bmpRIP !");
@@ -246,6 +252,7 @@ void ErrExit(int what)
 void GameOver()
 {
 	PlaySound(NULL, NULL, NULL);
+	KillTimer(bHwnd, bTimer);
 
 
 
@@ -259,6 +266,8 @@ void GameOver()
 void InitGame()
 {
 	speed = 1.0f;
+	distance = 2400.0f;
+
 	wcscpy_s(current_player, L"TARLYO");
 	name_set = false;
 	
@@ -303,6 +312,9 @@ void InitGame()
 		for (int i = 0; i < vHeroShots.size(); ++i)
 			if (!FreeMem(&vHeroShots[i]))LogErr(L"Error releasing vHeroShots !");
 	vHeroShots.clear();
+
+	if (!vRings.empty())for (int i = 0; i < vRings.size(); ++i)delete vRings[i];
+	vRings.clear();
 }
 
 INT_PTR CALLBACK DlgProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lParam)
@@ -347,6 +359,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 	case WM_CREATE:
 		if (bIns)
 		{
+			SetTimer(hwnd, (UINT_PTR)(bTimer), 100, NULL);
 			bBar = CreateMenu();
 			bMain = CreateMenu();
 			bStore = CreateMenu();
@@ -476,6 +489,22 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 		}
 		break;
 
+	case WM_TIMER:
+		if (Hero)
+		{
+			switch (nature_dir)
+			{
+			case dirs::left:
+				distance--;
+				break;
+
+			case dirs::right:
+				distance++;
+				break;
+			}
+		}
+		break;
+
 	case WM_KEYDOWN:
 		if (Hero)
 		{
@@ -511,6 +540,33 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 					}
 
 					Hero->jump(bGrounds);
+				}
+				break;
+
+			case VK_SHIFT:
+				if (Hero)
+				{
+					if (score <= 0 || vEvils.empty())
+					{
+						if (sound)mciSendString(L"play .\\res\\snd\\negative.wav", NULL, NULL, NULL);
+						break;
+					}
+
+					dll::BAG<D2D1_RECT_F> bEvils(vEvils.size());
+
+					if (!vEvils.empty())
+					{
+						for (int i = 0; i < vEvils.size(); ++i)bEvils.push_back(vEvils[i]->get_rect());
+
+						dll::sort(bEvils, Hero->get_rect());
+
+						if (sound)mciSendString(L"play .\\res\\snd\\shoot.wav", NULL, NULL, NULL);
+						--score;
+						if (score < 0)score = 0;
+
+						vHeroShots.push_back(dll::SHOT::create(Hero->center.x, Hero->center.y,
+							bEvils[0].left + 15.0f, bEvils[0].top + 15.0f));
+					}
 				}
 				break;
 			}
@@ -698,6 +754,12 @@ void CreateResources()
 			if (!bmpRing)
 			{
 				LogErr(L"Error loading bmpRing");
+				ErrExit(eD2D);
+			}
+			bmpSmallRing = Load(L".\\res\\img\\SmallRing.png", Draw, bmp_result);
+			if (!bmpSmallRing)
+			{
+				LogErr(L"Error loading bmpSmallRing");
 				ErrExit(eD2D);
 			}
 			bmpSpit = Load(L".\\res\\img\\spit.png", Draw, bmp_result);
@@ -1095,9 +1157,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 		// vTiles ********************************************
 
-		if (vTiles.size() < 10 && RandIt(0, 100) == 66)
+		if (vTiles.size() < 6 && RandIt(0, 100) == 66)
 		{
-			float sx = scr_width + RandIt(0.0f, scr_width);
+			float sx = scr_width + RandIt(0.0f, scr_width / 1.5f);
 			float sy = ground - 100.0f;
 
 			D2D1_RECT_F dummy{ sx, sy, sx + 300.0f, sy + 100.0f };
@@ -1202,9 +1264,110 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 		///////////////////////////////////////////////////////
 
+		// vRings ********************************************
+
+		if (vRings.size() < 40 && RandIt(0, 100) == 66)
+		{
+			float sx = scr_width + RandIt(10.0f, 30.0f);
+			D2D1_RECT_F dummy{};
+			dummy.left = sx;
+			dummy.top = ground - 25.0f; 
+			dummy.right = sx + 20.0f; 
+			dummy.bottom = ground - 5.0f;
+
+			bool ok = true;
+
+			if (!vTiles.empty())
+			{
+				for(int i=0;i<vTiles.size();++i)
+					if (dll::intersect(dummy, vTiles[i]->get_rect()))
+					{
+						ok = false;
+						break;
+					}
+			}
+
+			if (ok)
+			{
+				if (!vRings.empty())
+				{
+					bool overlap = true;
+
+					while (overlap)
+					{
+						overlap = false;
+
+						for (int i = 0; i < vRings.size(); ++i)
+						{
+							if (dll::intersect(dummy, vRings[i]->get_rect()))
+							{
+								overlap = true;
+								dummy.left++;
+								sx = dummy.left;
+								break;
+							}
+						}
+					}
+				}
+				vRings.push_back(new dll::PROTON(sx, ground - 25.0f, 20.0f, 20.0f));
+			}
+			
+		}
+
+		if (!vRings.empty())
+		{
+			for (std::vector<dll::PROTON*>::iterator ring = vRings.begin(); ring < vRings.end(); ++ring)
+			{
+				bool erased = false;
+				switch (nature_dir)
+				{
+				case dirs::left:
+					(*ring)->start.x -= 2.0f + speed / 10.0f;
+					(*ring)->set_edges();
+					if ((*ring)->end.x <= 0)
+						{
+							delete* ring;
+							vRings.erase(ring);
+							erased = true;
+						}
+					break;
+
+				case dirs::right:
+					(*ring)->start.x += 2.0f + speed / 10.0f;
+					(*ring)->set_edges();
+					if ((*ring)->start.x >= scr_width * 2.0f)
+					{
+						delete* ring;
+						vRings.erase(ring);
+						erased = true;
+					}
+					break;
+				}
+
+				if (erased)break;
+			}
+		}
+
+		if (!vRings.empty() && Hero)
+		{
+			for (std::vector<dll::PROTON*>::iterator ring = vRings.begin(); ring < vRings.end(); ++ring)
+			{
+				if (dll::intersect(Hero->get_rect(), (*ring)->get_rect()))
+				{
+					if (sound)mciSendString(L"play .\\res\\snd\\ring.wav", NULL, NULL, NULL);
+					++score;
+					delete (*ring);
+					vRings.erase(ring);
+					break;
+				}
+			}
+		}
+
+		//////////////////////////////////////////////////////
+
 		// vEvils *********************************************
 
-		if (vEvils.size() < 5 + speed && RandIt(0, 200) == 66)
+		if (vEvils.size() < 5 + speed && RandIt(0, 350) == 66)
 		{
 			creatures type = static_cast<creatures>(RandIt(0, 2));
 			
@@ -1226,7 +1389,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 					for (int i = 0; i < vTiles.size(); ++i) bGrounds.push_back(vTiles[i]);
 				}
 
-				if (!(*evil)->move(speed, bGrounds))
+				if (!(*evil)->move(speed, bGrounds, nature_dir))
 				{
 					(*evil)->Release();
 					vEvils.erase(evil);
@@ -1266,8 +1429,41 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 		////////////////////////////////////////////////////////
 
+		if (Hero && !vEvilShots.empty())
+		{
+			for (std::vector<dll::SHOT*>::iterator shot = vEvilShots.begin(); shot < vEvilShots.end(); ++shot)
+			{
+				if (dll::intersect(Hero->get_rect(), (*shot)->get_rect()))
+				{
+					Hero->lifes -= (*shot)->damage;
+					(*shot)->Release();
+					vEvilShots.erase(shot);
+					if (Hero->lifes <= 0)
+					{
+						hero_killed = true;
+						RipRect.left = Hero->start.x;
+						RipRect.top = Hero->start.y;
+						RipRect.right = Hero->end.x;
+						RipRect.bottom = Hero->end.y;
+						Hero->Release();
+					}
+					break;
+				}
+			}
+		}
 
-
+		if (!vHeroShots.empty())
+		{
+			for (std::vector<dll::SHOT*>::iterator shot = vHeroShots.begin(); shot < vHeroShots.end(); ++shot)
+			{
+				if (!(*shot)->move(speed))
+				{
+					(*shot)->Release();
+					vHeroShots.erase(shot);
+					break;
+				}
+			}
+		}
 		
 		// DRAW THINGS **************************************************
 
@@ -1385,13 +1581,72 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		}
 		if (!vHeroShots.empty())
 		{
-			for (int i = 0; i < vHeroShots.size(); ++i)Draw->DrawBitmap(bmpSpit, vHeroShots[i]->get_rect());
+			for (int i = 0; i < vHeroShots.size(); ++i)Draw->DrawBitmap(bmpSmallRing, vHeroShots[i]->get_rect());
+
 		}
 
+		if (!vRings.empty())
+		{
+			for (int i = 0; i < vRings.size(); ++i)Draw->DrawBitmap(bmpRing, vRings[i]->get_rect());
+		}
 
 		/////////////////////////////////////////////////////////////////
 
+		// STATUS TEXT *********************************************
+
+		if (inactBrush && midFormat)
+		{
+			wchar_t txt[200]{ L"герой: " };
+			wchar_t add[5]{ L"\0" };
+			int stat_size{ 0 };
+
+			wcscat_s(txt, current_player);
+			
+			wcscat_s(txt, L", рингове: ");
+			wsprintf(add, L"%d", score);
+			wcscat_s(txt, add);
+
+			wcscat_s(txt, L", скорост: ");
+			wsprintf(add, L"%d", (int)(speed));
+			wcscat_s(txt, add);
+
+			for (int i = 0; i < 200; ++i)
+			{
+				if (txt[i] != '\0')++stat_size;
+				else break;
+			}
+
+			Draw->DrawTextW(txt, stat_size, midFormat, D2D1::RectF(10.0f, ground + 20.0f, scr_width, scr_height), inactBrush);
+
+			stat_size = 0;
+			swprintf_s(txt, 200, L"остават: %.2f м.", distance / 100.0f);
+
+			for (int i = 0; i < 200; ++i)
+			{
+				if (txt[i] != '\0')++stat_size;
+				else break;
+			}
+
+			Draw->DrawTextW(txt, stat_size, midFormat, D2D1::RectF(scr_width - 400.0f, sky + 10.0f, scr_width, scr_height), inactBrush);
+		}
+
+		////////////////////////////////////////////////////////////
+
 		Draw->EndDraw();
+
+		if (hero_killed)
+		{
+			Draw->BeginDraw();
+			Draw->DrawBitmap(bmpRIP, RipRect);
+			if (sound)
+			{
+				PlaySound(NULL, NULL, NULL);
+				if (sound)PlaySound(L".\\res\\snd\\killed.wav", NULL, SND_SYNC);
+				else Sleep(4000);
+				GameOver();
+			}
+			Draw->EndDraw();
+		}
 	}
 
 	ReleaseResources();
