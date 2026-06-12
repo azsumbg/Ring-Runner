@@ -38,6 +38,8 @@ struct RINGHELP_API FADING
 
 	D2D1_RECT_F view_rect{};
 
+	bool chest_opened = false;
+
 	int delay = 20;
 	
 	float opacity = 1.0f;

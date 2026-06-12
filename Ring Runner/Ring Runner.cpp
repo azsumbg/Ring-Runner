@@ -133,6 +133,9 @@ bool b3Hglt = false;
 bool hero_killed = false;
 D2D1_RECT_F RipRect{};
 
+bool portal_opened = false;
+D2D1_RECT_F PortalRect{};
+
 bool name_set = false;
 wchar_t current_player[16]{ L"TARLYO" };
 
@@ -163,6 +166,8 @@ std::vector<dll::SHOT*> vEvilShots;
 std::vector<dll::SHOT*> vHeroShots;
 std::vector<dll::PROTON*>vRings;
 
+std::vector<FADING> vAssets;
+
 /////////////////////////////////////////////////////////////////
 
 template<typename T>concept HasRelease = requires(T check)
@@ -180,6 +185,21 @@ template<HasRelease T>bool FreeMem(T** var)
 
 	return false;
 };
+int portal_frame()
+{
+	static int frame = 0;
+	static int frame_delay = 3;
+
+	--frame_delay;
+	if (frame_delay <= 0)
+	{
+		frame_delay = 3;
+		++frame;
+		if (frame > 23)frame = 0;
+	}
+
+	return frame;
+}
 void LogErr(const wchar_t* what)
 {
 	std::wofstream err{ L".\\res\\data\\error.log",std::ios::app };
@@ -280,6 +300,7 @@ void InitGame()
 	hero_killed = false;
 	need_left = false;
 	need_right = false;
+	portal_opened = false;
 
 	nature_dir = dirs::stop;
 	
@@ -315,6 +336,8 @@ void InitGame()
 
 	if (!vRings.empty())for (int i = 0; i < vRings.size(); ++i)delete vRings[i];
 	vRings.clear();
+
+	vAssets.clear();
 }
 
 INT_PTR CALLBACK DlgProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lParam)
@@ -492,7 +515,8 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 	case WM_TIMER:
 		if (Hero)
 		{
-			switch (nature_dir)
+			if (distance > 0)
+				switch (nature_dir)
 			{
 			case dirs::left:
 				distance--;
@@ -501,6 +525,22 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 			case dirs::right:
 				distance++;
 				break;
+			}
+			else
+			{
+				if (!portal_opened)
+				{
+					portal_opened = true;
+					
+					float sx = scr_width + RandIt(200.0f, scr_width - 100.0f);
+
+					PortalRect.left = sx;
+					PortalRect.right = sx + 100.0f;
+					PortalRect.top = ground - 100.0f;
+					PortalRect.bottom = ground;
+
+					if (sound)mciSendString(L"play .\\res\\snd\\portal.wav", NULL, NULL, NULL);
+				}
 			}
 		}
 		break;
@@ -608,7 +648,6 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 
 		}
 		break;
-
 
 	default: return DefWindowProc(hwnd, ReceivedMsg, wParam, lParam);
 	}
@@ -1363,6 +1402,22 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 
+		if (portal_opened)
+		{
+			switch (nature_dir)
+			{
+			case dirs::left:
+				PortalRect.left -= 2.0f + speed / 10.0f;
+				PortalRect.right -= 2.0f + speed / 10.0f;
+				break;
+
+			case dirs::right:
+				PortalRect.left += 2.0f + speed / 10.0f;
+				PortalRect.right += 2.0f + speed / 10.0f;
+				break;
+			}
+		}
+
 		//////////////////////////////////////////////////////
 
 		// vEvils *********************************************
@@ -1465,6 +1520,120 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			}
 		}
 		
+		if (!vHeroShots.empty() && !vEvils.empty() && Hero)
+		{
+			bool killed = false;
+
+			for (std::vector<dll::EVIL*>::iterator evil = vEvils.begin(); evil < vEvils.end(); ++evil)
+			{
+				for (std::vector<dll::SHOT*>::iterator shot = vHeroShots.begin(); shot < vHeroShots.end(); ++shot)
+				{
+					if (dll::intersect((*shot)->get_rect(), (*evil)->get_rect()))
+					{
+						(*evil)->lifes -= Hero->damage;
+						(*shot)->Release();
+						vHeroShots.erase(shot);
+
+						if ((*evil)->lifes <= 0)
+						{
+							(*evil)->Release();
+							vEvils.erase(evil);
+							score += 5 * (int)(speed);
+							killed = true;
+						}
+						break;
+					}
+				}
+
+				if (killed)break;
+			}
+		}
+
+		///////////////////////////////////////////////////////
+
+		// ASSETS **********************************************
+
+		if (vAssets.size() < 3 && RandIt(0, 400) == 33)
+		{
+			FADING dummy{};
+			dummy.type = static_cast<assets>(RandIt(0, 2));
+			dummy.view_rect.left = scr_width + RandIt(10.0f, scr_width / 3.0f);
+			dummy.view_rect.right = dummy.view_rect.left + 32.0f;
+			dummy.view_rect.top = ground - 32.0f;
+			dummy.view_rect.bottom = ground;
+
+			bool ok = true;
+
+			if(!vTiles.empty())
+				for (int i = 0; i < vTiles.size(); ++i)
+				{
+					if (dll::intersect(dummy.view_rect, vTiles[i]->get_rect()))
+					{
+						ok = false;
+						break;
+					}
+				}
+
+			if (ok)vAssets.push_back(dummy);
+		}
+
+		if (!vAssets.empty())
+		{
+			for (std::vector<FADING>::iterator asset = vAssets.begin(); asset < vAssets.end(); ++asset)
+			{
+				switch (nature_dir)
+				{
+				case dirs::left:
+					asset->view_rect.left -= 2.0f + speed / 10.0f;
+					asset->view_rect.right -= 2.0f + speed / 10.0f;
+					break;
+				
+				case dirs::right:
+					asset->view_rect.left += 2.0f + speed / 10.0f;
+					asset->view_rect.right += 2.0f + speed / 10.0f;
+					break;
+				}
+
+				if (asset->view_rect.right <= -scr_width * 0.5f || asset->view_rect.left >= scr_width + scr_width * 0.5f)
+				{
+					vAssets.erase(asset);
+					break;
+				}
+			}
+		}
+
+		if (!vAssets.empty() && Hero)
+		{
+			for (int i = 0; i < vAssets.size(); ++i)
+			{
+				if (dll::intersect(Hero->get_rect(), vAssets[i].view_rect))
+				{
+					if (vAssets[i].chest_opened)continue;
+
+					vAssets[i].chest_opened = true;
+
+					switch (vAssets[i].type)
+					{
+					case assets::rings:
+						if (sound)mciSendString(L"play .\\res\\snd\\gold.wav", NULL, NULL, NULL);
+						score += 10;
+						break;
+
+					case assets::armor:
+						if (sound)mciSendString(L"play .\\res\\snd\\armor.wav", NULL, NULL, NULL);
+						++Hero->armor;
+						break;
+
+					case assets::potion:
+						if (sound)mciSendString(L"play .\\res\\snd\\life.wav", NULL, NULL, NULL);
+						if (Hero->lifes + 20 <= 100)Hero->lifes += 20;
+						else Hero->lifes = 100;
+						break;
+					}
+				}
+			}
+		}
+
 		// DRAW THINGS **************************************************
 
 		Draw->BeginDraw();
@@ -1589,6 +1758,44 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		{
 			for (int i = 0; i < vRings.size(); ++i)Draw->DrawBitmap(bmpRing, vRings[i]->get_rect());
 		}
+
+		if (!vAssets.empty())
+		{
+			for (int i = 0; i < vAssets.size(); ++i)
+			{
+				if (!vAssets[i].chest_opened)Draw->DrawBitmap(bmpChest, vAssets[i].view_rect);
+				else
+				{
+					float opacity = vAssets[i].get_opacity();
+
+					switch (vAssets[i].type)
+					{
+					case assets::rings:
+						Draw->DrawBitmap(bmpPileIcon, D2D1::RectF(vAssets[i].view_rect.left, vAssets[i].view_rect.top,
+							vAssets[i].view_rect.left + 30.0f, vAssets[i].view_rect.top + 20.0f), opacity);
+						break;
+
+					case assets::armor:
+						Draw->DrawBitmap(bmpArmorIcon, D2D1::RectF(vAssets[i].view_rect.left, vAssets[i].view_rect.top,
+							vAssets[i].view_rect.left + 20.0f, vAssets[i].view_rect.top + 20.0f), opacity);
+						break;
+
+					case assets::potion:
+						Draw->DrawBitmap(bmpLifeIcon, D2D1::RectF(vAssets[i].view_rect.left, vAssets[i].view_rect.top,
+							vAssets[i].view_rect.left + 20.0f, vAssets[i].view_rect.top + 20.0f), opacity);
+						break;
+					}
+
+					if (opacity <= 0)
+					{
+						vAssets.erase(vAssets.begin() + i);
+						break;
+					}
+				}
+			}
+		}
+
+		if (portal_opened)Draw->DrawBitmap(bmpPortal[portal_frame()], PortalRect);
 
 		/////////////////////////////////////////////////////////////////
 
