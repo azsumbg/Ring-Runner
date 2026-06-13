@@ -1152,7 +1152,7 @@ void CreateResources()
 	
 	PlaySound(L".\\res\\snd\\intro.wav", NULL, SND_ASYNC);
 
-	for (int i = 0; i < 240; ++i)
+	for (int i = 0; i < 280; ++i)
 	{
 		Draw->BeginDraw();
 		Draw->DrawBitmap(bmpIntro[Intro->get_frame()], Intro->get_rect());
@@ -1338,7 +1338,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				}
 			}
 
-			if ((!on_hill && Hero->end.y < ground) || (Hero->action == actions::fall && Hero->end.y < ground))
+			if ((!on_hill && Hero->end.y < ground))
 			{
 				dll::BAG<D2D1_RECT_F> bGrounds;
 
@@ -1512,6 +1512,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 		{
 			creatures type = static_cast<creatures>(RandIt(0, 2));
 			
+			if (sound)mciSendString(L"play .\\res\\snd\\evil_born.wav", NULL, NULL, NULL);
+
 			if (type != creatures::zombie_flyer)vEvils.push_back(dll::EVIL::create(type, scr_width + RandIt(20.0f, 100.0f),
 				ground - 35.0f));
 			else
@@ -1579,6 +1581,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 					int current_damage = ((*shot)->damage - Hero->armor);
 					if (current_damage <= 0)current_damage = 1;
 					Hero->lifes -= current_damage;
+					if (sound)mciSendString(L"play .\\res\\snd\\hurt.wav", NULL, NULL, NULL);
 					(*shot)->Release();
 					vEvilShots.erase(shot);
 					if (Hero->lifes <= 0)
@@ -1627,6 +1630,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 						if ((*evil)->lifes <= 0)
 						{
+							if (sound)mciSendString(L"play .\\res\\snd\\evil_killed.wav", NULL, NULL, NULL);
 							(*evil)->Release();
 							vEvils.erase(evil);
 							score += 5 * (int)(speed);
