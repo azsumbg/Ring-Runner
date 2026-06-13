@@ -87,6 +87,7 @@ IDWriteTextFormat* midFormat{ nullptr };
 IDWriteTextFormat* bigFormat{ nullptr };
 
 ID2D1Bitmap* bmpLogo{ nullptr };
+ID2D1Bitmap* bmpLevelUp{ nullptr };
 ID2D1Bitmap* bmpLoose{ nullptr };
 ID2D1Bitmap* bmpRecord{ nullptr };
 ID2D1Bitmap* bmpRing{ nullptr };
@@ -226,6 +227,7 @@ void ReleaseResources()
 	if (!FreeMem(&bigFormat))LogErr(L"Error releasing D2D1 main write bigTextFormat !");
 
 	if (!FreeMem(&bmpLogo))LogErr(L"Error releasing D2D1 main write bmpLogo !");
+	if (!FreeMem(&bmpLevelUp))LogErr(L"Error releasing D2D1 main write bmpLevelUp !");
 	if (!FreeMem(&bmpLoose))LogErr(L"Error releasing D2D1 main write bmpLoose !");
 	if (!FreeMem(&bmpRecord))LogErr(L"Error releasing D2D1 main write bmpRecord !");
 	if (!FreeMem(&bmpRing))LogErr(L"Error releasing D2D1 main write bmpRing !");
@@ -339,6 +341,71 @@ void InitGame()
 
 	vAssets.clear();
 }
+void LevelUp()
+{
+	Draw->BeginDraw();
+	Draw->DrawBitmap(bmpLevelUp, D2D1::RectF(0, 0, scr_width, scr_height));
+	Draw->EndDraw();
+
+	if (sound)
+	{
+		PlaySound(NULL, NULL, NULL);
+		PlaySound(L".\\res\\snd\\levelup.wav", NULL, SND_SYNC);
+		PlaySound(sound_file, NULL, SND_ASYNC | SND_LOOP);
+	}
+	else Sleep(3500);
+
+	++speed;
+	score += 10 * (int)(speed);
+
+	distance = 2400.0f + speed + 50.0f;
+
+	FreeMem(&Background);
+	Background = dll::FIELD::create(fields::background, 0, 50.0f);
+
+	hero_killed = false;
+	need_left = false;
+	need_right = false;
+	portal_opened = false;
+
+	nature_dir = dirs::stop;
+
+	if (!vTiles.empty())
+		for (int i = 0; i < vTiles.size(); ++i)
+			if (!FreeMem(&vTiles[i]))LogErr(L"Error releasing vTiles !");
+	vTiles.clear();
+
+	if (!vMainGround.empty())
+		for (int i = 0; i < vMainGround.size(); ++i)
+			if (!FreeMem(&vMainGround[i]))LogErr(L"Error releasing vMainGround !");
+	vMainGround.clear();
+	for (float sx = -scr_width; sx < 2.0f * scr_width; sx += 100.0f)
+		vMainGround.push_back(dll::FIELD::create(fields::flat_ground, sx, ground));
+
+	if (Hero)Hero->Release();
+	Hero = dll::HERO::create(scr_width / 2.0f - 50.0f, ground - 35.0f);
+
+	if (!vEvils.empty())
+		for (int i = 0; i < vEvils.size(); ++i)
+			if (!FreeMem(&vEvils[i]))LogErr(L"Error releasing vEvils !");
+	vEvils.clear();
+
+	if (!vEvilShots.empty())
+		for (int i = 0; i < vEvilShots.size(); ++i)
+			if (!FreeMem(&vEvilShots[i]))LogErr(L"Error releasing vEvilShots !");
+	vEvilShots.clear();
+
+	if (!vHeroShots.empty())
+		for (int i = 0; i < vHeroShots.size(); ++i)
+			if (!FreeMem(&vHeroShots[i]))LogErr(L"Error releasing vHeroShots !");
+	vHeroShots.clear();
+
+	if (!vRings.empty())for (int i = 0; i < vRings.size(); ++i)delete vRings[i];
+	vRings.clear();
+
+	vAssets.clear();
+}
+
 
 INT_PTR CALLBACK DlgProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -566,7 +633,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 				break;
 
 			case VK_UP:
-				if (Hero->action != actions::jump)
+				if (Hero->action != actions::jump && Hero->action != actions::fall)
 				{
 					dll::BAG<D2D1_RECT_F> bGrounds;
 					
@@ -606,6 +673,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 
 						vHeroShots.push_back(dll::SHOT::create(Hero->center.x, Hero->center.y,
 							bEvils[0].left + 15.0f, bEvils[0].top + 15.0f));
+						vHeroShots.back()->damage = Hero->damage;
 					}
 				}
 				break;
@@ -775,6 +843,12 @@ void CreateResources()
 			if (!bmpLogo)
 			{
 				LogErr(L"Error loading bmpLogo");
+				ErrExit(eD2D);
+			}
+			bmpLevelUp = Load(L".\\res\\img\\field\\level.png", Draw, bmp_result);
+			if (!bmpLevelUp)
+			{
+				LogErr(L"Error loading bmpLevelUp");
 				ErrExit(eD2D);
 			}
 			bmpLoose = Load(L".\\res\\img\\Loose.png", Draw, bmp_result);
@@ -1129,7 +1203,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			continue;
 		}
 
-
 		//////////////////////////////////////////////////////////////
 
 		if (Hero)
@@ -1265,7 +1338,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				}
 			}
 
-			if (!on_hill && Hero->end.y < ground)
+			if ((!on_hill && Hero->end.y < ground) || (Hero->action == actions::fall && Hero->end.y < ground))
 			{
 				dll::BAG<D2D1_RECT_F> bGrounds;
 
@@ -1284,7 +1357,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 		if (Hero)
 		{
-			if (Hero->action == actions::jump)
+			if (Hero->action == actions::jump || Hero->action == actions::fall)
 			{
 				dll::BAG<D2D1_RECT_F> bGrounds;
 
@@ -1297,7 +1370,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 					for (int i = 0; i < vTiles.size(); ++i) bGrounds.push_back(vTiles[i]->get_rect());
 				}
 
-				Hero->jump(bGrounds);
+				if (Hero->action == actions::fall)Hero->fall(bGrounds);
+				else Hero->jump(bGrounds);
+			}
+			
+			if (Hero->end.y > ground)
+			{
+				Hero->end.y = ground;
+				Hero->start.y = Hero->end.y - Hero->get_height();
+				Hero->set_edges();
 			}
 		}
 
@@ -1416,6 +1497,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				PortalRect.right += 2.0f + speed / 10.0f;
 				break;
 			}
+
+			if (Hero)
+			{
+				if (dll::intersect(Hero->get_rect(), PortalRect))LevelUp();
+			}
 		}
 
 		//////////////////////////////////////////////////////
@@ -1490,7 +1576,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			{
 				if (dll::intersect(Hero->get_rect(), (*shot)->get_rect()))
 				{
-					Hero->lifes -= (*shot)->damage;
+					int current_damage = ((*shot)->damage - Hero->armor);
+					if (current_damage <= 0)current_damage = 1;
+					Hero->lifes -= current_damage;
 					(*shot)->Release();
 					vEvilShots.erase(shot);
 					if (Hero->lifes <= 0)
@@ -1530,7 +1618,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				{
 					if (dll::intersect((*shot)->get_rect(), (*evil)->get_rect()))
 					{
-						(*evil)->lifes -= Hero->damage;
+						int current_damage = ((*shot)->damage - (*evil)->armor);
+						if (current_damage <= 0)current_damage = 1;
+
+						(*evil)->lifes -= current_damage;
 						(*shot)->Release();
 						vHeroShots.erase(shot);
 
@@ -1801,7 +1892,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 
 		// STATUS TEXT *********************************************
 
-		if (inactBrush && midFormat)
+		if (inactBrush && midFormat && Hero)
 		{
 			wchar_t txt[200]{ L"герой: " };
 			wchar_t add[5]{ L"\0" };
@@ -1811,6 +1902,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 			
 			wcscat_s(txt, L", рингове: ");
 			wsprintf(add, L"%d", score);
+			wcscat_s(txt, add);
+
+			wcscat_s(txt, L", броня: ");
+			wsprintf(add, L"%d", Hero->armor);
 			wcscat_s(txt, add);
 
 			wcscat_s(txt, L", скорост: ");
