@@ -457,7 +457,56 @@ void LevelUp()
 
 	vAssets.clear();
 }
+void ShowRecord()
+{
+	int result{ 0 };
+	CheckFile(record_file, &result);
 
+	if (result == FILE_NOT_EXIST)
+	{
+		if (sound)mciSendString(L"play .\\res\\snd\\exclamation.wav", NULL, NULL, NULL);
+		MessageBox(bHwnd, L"Все ще няма рекорд на играта !\n\nПостарай се повече !", L"Липсва файл",
+			MB_OK | MB_APPLMODAL | MB_ICONASTERISK);
+		return;
+	}
+
+	std::wifstream rec(record_file);
+
+	wchar_t txt[100]{ L"НАЙ-ДОБЪР ИГРАЧ: " };
+	wchar_t saved_info[16]{ L"\0" };
+	
+	rec >> result;
+
+	for (int i = 0; i < 16; ++i)
+	{
+		int letter = 0;
+		rec >> letter;
+		saved_info[i] = static_cast<wchar_t>(letter);
+	}
+
+	wcscat_s(txt, saved_info);
+	wcscat_s(txt, L"\nСВЕТОВЕН РЕКОРД: ");
+
+	wsprintf(saved_info, L"%d", result);
+	wcscat_s(txt, saved_info);
+
+	result = 0;
+
+	for (int i = 0; i < 100; ++i)
+	{
+		if (txt[i] != '\0')++result;
+		else break;
+	}
+
+	Draw->BeginDraw();
+	Draw->DrawBitmap(bmpIntro[Intro->get_frame()], Intro->get_rect());
+	if (hgltBrush && midFormat)Draw->DrawTextW(txt, result, midFormat, D2D1::RectF(100.0f, 100.0f, scr_width, scr_height), 
+		hgltBrush);
+	Draw->EndDraw();
+
+	if (sound)mciSendString(L"play .\\res\\snd\\showrec.wav", NULL, NULL, NULL);
+	Sleep(4000);
+}
 
 INT_PTR CALLBACK DlgProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -818,7 +867,11 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 			break;
 
 
-
+		case mHoF:
+			pause = true;
+			ShowRecord();
+			pause = false;
+			break;
 		}
 		break;
 
@@ -1481,11 +1534,40 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				else Hero->jump(bGrounds);
 			}
 			
-			if (Hero->end.y > ground)
+			
+			if (!vTiles.empty())
 			{
-				Hero->end.y = ground;
-				Hero->start.y = Hero->end.y - Hero->get_height();
-				Hero->set_edges();
+				dll::BAG<D2D1_RECT_F>bTiles(vTiles.size());
+
+				for (int i = 0; i < vTiles.size(); ++i)
+					if (vTiles[i]->type != fields::flat_ground)bTiles.push_back(vTiles[i]->get_rect());
+
+				dll::sort(bTiles, Hero->get_rect());
+
+				if (Hero->end.y < ground && dll::intersect(Hero->get_rect(), bTiles[0]))
+				{
+
+					float an_slope{ (bTiles[0].bottom - bTiles[0].top) / (bTiles[0].right - bTiles[0].left) };
+					float an_intercept = bTiles[0].bottom - bTiles[0].left * an_slope;
+
+					if (!(Hero->end.x == bTiles[0].left || Hero->end.x == bTiles[0].right))
+					{
+						D2D1_POINT_2F point_on_line{ Hero->end.x, Hero->end.x * an_slope + an_intercept };
+
+						if (dll::distance(Hero->end, point_on_line) > 0)
+						{
+							Hero->start.y += 2.0f + speed / 10.0f;
+							Hero->set_edges();
+						}
+					}
+				}
+				
+				if (Hero->end.y > ground)
+				{
+					Hero->end.y = ground;
+					Hero->start.y = Hero->end.y - Hero->get_height();
+					Hero->set_edges();
+				}
 			}
 		}
 
