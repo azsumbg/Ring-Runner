@@ -280,7 +280,7 @@ BOOL CheckRecord()
 	{
 		std::wofstream rec(record_file);
 		rec << score << std::endl;
-		for (int i = 0; i < 16; ++i)rec << current_player[i] << std::endl;
+		for (int i = 0; i < 16; ++i)rec << static_cast<int>(current_player[i]) << std::endl;
 		rec.close();
 		return first_record;
 	}
@@ -295,7 +295,7 @@ BOOL CheckRecord()
 	{
 		std::wofstream rec(record_file);
 		rec << score << std::endl;
-		for (int i = 0; i < 16; ++i)rec << current_player[i] << std::endl;
+		for (int i = 0; i < 16; ++i)rec << static_cast<int>(current_player[i]) << std::endl;
 		rec.close();
 		return record;
 	}
@@ -485,7 +485,7 @@ void ShowRecord()
 	}
 
 	wcscat_s(txt, saved_info);
-	wcscat_s(txt, L"\nСВЕТОВЕН РЕКОРД: ");
+	wcscat_s(txt, L"\n\n\nСВЕТОВЕН РЕКОРД: ");
 
 	wsprintf(saved_info, L"%d", result);
 	wcscat_s(txt, saved_info);
@@ -500,13 +500,268 @@ void ShowRecord()
 
 	Draw->BeginDraw();
 	Draw->DrawBitmap(bmpIntro[Intro->get_frame()], Intro->get_rect());
-	if (hgltBrush && midFormat)Draw->DrawTextW(txt, result, midFormat, D2D1::RectF(100.0f, 100.0f, scr_width, scr_height), 
-		hgltBrush);
+	if (inactBrush && bigFormat)Draw->DrawTextW(txt, result, bigFormat, D2D1::RectF(50.0f, 100.0f, scr_width, scr_height), 
+		inactBrush);
 	Draw->EndDraw();
 
 	if (sound)mciSendString(L"play .\\res\\snd\\showrec.wav", NULL, NULL, NULL);
 	Sleep(4000);
 }
+void SaveGame()
+{
+	int result{ 0 };
+	CheckFile(save_file, &result);
+	if (result == FILE_EXIST)
+	{
+		if (sound)mciSendString(L"play .\\res\\snd\\exclamation.wav", NULL, NULL, NULL);
+		if (MessageBox(bHwnd, L"Има предишна записана игра !\n\nНаистина ли да я презапиша ?", L"Презапис",
+			MB_YESNO | MB_APPLMODAL | MB_ICONQUESTION) == IDNO)return;
+	}
+
+	std::wofstream save(save_file);
+
+	save << speed << std::endl;
+	save << distance << std::endl;
+
+	save << hero_killed << std::endl;
+	save << portal_opened << std::endl;
+	save << PortalRect.left << std::endl;
+	save << PortalRect.right << std::endl;
+
+	for (int i = 0; i < 16; ++i)save << static_cast<int>(current_player[i]) << std::endl;
+	save << name_set << std::endl;
+
+	save << vTiles.size() << std::endl;
+	if (!vTiles.empty())
+	{
+		for (int i = 0; i < vTiles.size(); ++i)
+		{
+			save << static_cast<int>(vTiles[i]->type) << std::endl;
+			save << vTiles[i]->start.x << std::endl;
+			save << vTiles[i]->start.y << std::endl;
+		}
+	}
+
+	save << vRings.size() << std::endl;
+	if (!vRings.empty())
+	{
+		for (int i = 0; i < vRings.size(); ++i)save << vRings[i]->start.x << std::endl;
+	}
+
+	save << vEvils.size() << std::endl;
+	if (!vEvils.empty())
+	{
+		for (int i = 0; i < vEvils.size(); ++i)
+		{
+			save << static_cast<int>(vEvils[i]->type) << std::endl;
+			save << vEvils[i]->start.x << std::endl;
+			save << vEvils[i]->start.y << std::endl;
+			save << vEvils[i]->lifes << std::endl;
+		}
+	}
+
+	save << vAssets.size() << std::endl;
+	if (!vAssets.empty())
+	{
+		for (int i = 0; i < vAssets.size(); ++i)
+		{
+			save << static_cast<int>(vAssets[i].type) << std::endl;
+			save << vAssets[i].view_rect.left << std::endl;
+			save << vAssets[i].view_rect.right << std::endl;
+			save << vAssets[i].view_rect.top << std::endl;
+			save << vAssets[i].view_rect.bottom << std::endl;
+		}
+	}
+
+	save << Hero->lifes << std::endl;
+
+	save.close();
+
+	if (sound)mciSendString(L"play .\\res\\snd\\save.wav", NULL, NULL, NULL);
+
+	MessageBox(bHwnd, L"Играта е запазена !", L"Запис", MB_OK | MB_APPLMODAL | MB_ICONINFORMATION);
+}
+void LoadGame()
+{
+	int result{ 0 };
+	CheckFile(save_file, &result);
+
+	if (result == FILE_NOT_EXIST)
+	{
+		if (sound)mciSendString(L"play .\\res\\snd\\exclamation.wav", NULL, NULL, NULL);
+		MessageBox(bHwnd, L"Все ще няма записана игра !\n\nПостарай се повече !", L"Липсва файл",
+			MB_OK | MB_APPLMODAL | MB_ICONASTERISK);
+		return;
+	}
+	else
+	{
+		if (sound)mciSendString(L"play .\\res\\snd\\exclamation.wav", NULL, NULL, NULL);
+		if (MessageBox(bHwnd, L"Настоящата игра ще бъде изгубена !\n\nНаистина ли да я презапиша ?", L"Презапис",
+			MB_YESNO | MB_APPLMODAL | MB_ICONQUESTION) == IDNO)return;
+	}
+
+	FreeMem(&Background);
+	Background = dll::FIELD::create(fields::background, 0, 50.0f);
+
+	hero_killed = false;
+	need_left = false;
+	need_right = false;
+	portal_opened = false;
+
+	nature_dir = dirs::stop;
+
+	if (!vTiles.empty())
+		for (int i = 0; i < vTiles.size(); ++i)
+			if (!FreeMem(&vTiles[i]))LogErr(L"Error releasing vTiles !");
+	vTiles.clear();
+
+	if (!vMainGround.empty())
+		for (int i = 0; i < vMainGround.size(); ++i)
+			if (!FreeMem(&vMainGround[i]))LogErr(L"Error releasing vMainGround !");
+	vMainGround.clear();
+	for (float sx = -scr_width; sx < 2.0f * scr_width; sx += 100.0f)
+		vMainGround.push_back(dll::FIELD::create(fields::flat_ground, sx, ground));
+
+	if (Hero)Hero->Release();
+	Hero = dll::HERO::create(scr_width / 2.0f - 50.0f, ground - 35.0f);
+
+	if (!vEvils.empty())
+		for (int i = 0; i < vEvils.size(); ++i)
+			if (!FreeMem(&vEvils[i]))LogErr(L"Error releasing vEvils !");
+	vEvils.clear();
+
+	if (!vEvilShots.empty())
+		for (int i = 0; i < vEvilShots.size(); ++i)
+			if (!FreeMem(&vEvilShots[i]))LogErr(L"Error releasing vEvilShots !");
+	vEvilShots.clear();
+
+	if (!vHeroShots.empty())
+		for (int i = 0; i < vHeroShots.size(); ++i)
+			if (!FreeMem(&vHeroShots[i]))LogErr(L"Error releasing vHeroShots !");
+	vHeroShots.clear();
+
+	if (!vRings.empty())for (int i = 0; i < vRings.size(); ++i)delete vRings[i];
+	vRings.clear();
+
+	vAssets.clear();
+
+	///////////////////////////////////////////////////////////////////////////////////
+
+	std::wifstream save(save_file);
+
+	save >> speed;
+	save >> distance;
+
+	save >> hero_killed;
+	if (hero_killed)GameOver();
+
+	float temp_x{};
+	float temp_y{};
+
+	save >> portal_opened;
+	save >> temp_x;
+	save >> temp_y;
+	if (portal_opened)
+	{
+		PortalRect.left = temp_x;
+		PortalRect.top = temp_y;
+		PortalRect.right = temp_x + 100.0f;
+		PortalRect.bottom = temp_y + 100.0f;
+	}
+
+	for (int i = 0; i < 16; ++i)
+	{
+		int letter{ 0 };
+		save >> letter;
+		current_player[i] = static_cast<wchar_t>(letter);
+	}
+	save >> name_set;
+
+	save >> result;
+	if (result > 0)
+	{
+		for (int i = 0; i < result; ++i)
+		{
+			int ttype{};
+			float tx{};
+			float ty{};
+
+			save >> ttype;
+			save >> tx;
+			save >> ty;
+
+			vTiles.push_back(dll::FIELD::create(static_cast<fields>(ttype), tx, ty));
+		}
+	}
+
+	save >> result;
+	if (result > 0)
+	{
+		for (int i = 0; i < result; ++i)
+		{
+			int tx{};
+			save >> tx;
+			vRings.push_back(new dll::PROTON(tx, ground - 25.0f, 20.0f, 20.0f));
+		}
+	}
+
+	save >> result;
+	if (result > 0)
+	{
+		for (int i = 0; i < result; ++i)
+		{
+			int ttype{};
+			float tx{};
+			float ty{};
+			int tlifes{};
+
+			save >> ttype;
+			save >> tx;
+			save >> ty;
+			save >> tlifes;
+
+			vEvils.push_back(dll::EVIL::create(static_cast<creatures>(ttype), tx, ty));
+			vEvils.back()->lifes = tlifes;
+		}
+	}
+
+	save >> result;
+	if (result > 0)
+	{
+		for (int i = 0; i < result; ++i)
+		{
+			int ttype{};
+			float tleft{};
+			float tright{};
+			float ttop{};
+			float tbottom{};
+
+			save >> ttype;
+			save >> tleft;
+			save >> tright;
+			save >> ttop;
+			save >> tbottom;
+
+			FADING dummy{};
+			dummy.type = static_cast<assets>(ttype);
+			dummy.view_rect.left = tleft;
+			dummy.view_rect.right = tright;
+			dummy.view_rect.top = ttop;
+			dummy.view_rect.bottom = tbottom;
+			
+			vAssets.push_back(dummy);
+		}
+	}
+
+	save >> Hero->lifes;
+
+	save.close();
+
+	if (sound)mciSendString(L"play .\\res\\snd\\save.wav", NULL, NULL, NULL);
+
+	MessageBox(bHwnd, L"Играта е заредена !", L"Зареждане", MB_OK | MB_APPLMODAL | MB_ICONINFORMATION);
+}
+
 
 INT_PTR CALLBACK DlgProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -866,6 +1121,17 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 			SendMessage(hwnd, WM_CLOSE, NULL, NULL);
 			break;
 
+		case mSave:
+			pause = true;
+			SaveGame();
+			pause = false;
+			break;
+
+		case mLoad:
+			pause = true;
+			LoadGame();
+			pause = false;
+			break;
 
 		case mHoF:
 			pause = true;
@@ -1533,7 +1799,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
 				if (Hero->action == actions::fall)Hero->fall(bGrounds);
 				else Hero->jump(bGrounds);
 			}
-			
 			
 			if (!vTiles.empty())
 			{
