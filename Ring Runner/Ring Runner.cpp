@@ -341,6 +341,7 @@ void InitGame()
 {
 	speed = 1.0f;
 	distance = 2400.0f;
+	score = 0;
 
 	wcscpy_s(current_player, L"TARLYO");
 	name_set = false;
@@ -522,6 +523,7 @@ void SaveGame()
 
 	save << speed << std::endl;
 	save << distance << std::endl;
+	save << score << std::endl;
 
 	save << hero_killed << std::endl;
 	save << portal_opened << std::endl;
@@ -565,6 +567,7 @@ void SaveGame()
 	{
 		for (int i = 0; i < vAssets.size(); ++i)
 		{
+			save << vAssets[i].chest_opened << std::endl;
 			save << static_cast<int>(vAssets[i].type) << std::endl;
 			save << vAssets[i].view_rect.left << std::endl;
 			save << vAssets[i].view_rect.right << std::endl;
@@ -651,6 +654,7 @@ void LoadGame()
 
 	save >> speed;
 	save >> distance;
+	save >> score;
 
 	save >> hero_killed;
 	if (hero_killed)GameOver();
@@ -699,7 +703,7 @@ void LoadGame()
 	{
 		for (int i = 0; i < result; ++i)
 		{
-			int tx{};
+			float tx{};
 			save >> tx;
 			vRings.push_back(new dll::PROTON(tx, ground - 25.0f, 20.0f, 20.0f));
 		}
@@ -730,12 +734,14 @@ void LoadGame()
 	{
 		for (int i = 0; i < result; ++i)
 		{
+			bool topened{};
 			int ttype{};
 			float tleft{};
 			float tright{};
 			float ttop{};
 			float tbottom{};
 
+			save >> topened;
 			save >> ttype;
 			save >> tleft;
 			save >> tright;
@@ -743,6 +749,7 @@ void LoadGame()
 			save >> tbottom;
 
 			FADING dummy{};
+			dummy.chest_opened = topened;
 			dummy.type = static_cast<assets>(ttype);
 			dummy.view_rect.left = tleft;
 			dummy.view_rect.right = tright;
@@ -761,7 +768,62 @@ void LoadGame()
 
 	MessageBox(bHwnd, L"Играта е заредена !", L"Зареждане", MB_OK | MB_APPLMODAL | MB_ICONINFORMATION);
 }
+void ShowHelp()
+{
+	int result = 0;
+	CheckFile(help_file, &result);
 
+	if (result == FILE_NOT_EXIST)
+	{
+		if (sound)mciSendString(L"play .\\res\\snd\\negative.wav", NULL, NULL, NULL);
+		MessageBox(bHwnd, L"Липсва помощна информация за играта !\n\nСвържете се с разработчика !", L"Липсва файл",
+			MB_OK | MB_APPLMODAL | MB_ICONASTERISK);
+		return;
+	}
+
+	wchar_t txt[1000]{ L"\0" };
+	
+	result = 0;
+
+	std::wifstream help(help_file);
+
+	help >> result;
+
+	for (int i = 0; i < result; ++i)
+	{
+		int letter = 0;
+		help >> letter;
+		txt[i] = static_cast<int>(letter);
+	}
+
+	help.close();
+
+	Draw->BeginDraw();
+	Draw->DrawBitmap(bmpIntro[Intro->get_frame()], Intro->get_rect());
+	if (txtBrush && inactBrush && hgltBrush && statBrush && nrmFormat && b1BckgBrush && b2BckgBrush && b3BckgBrush)
+	{
+		Draw->FillRectangle(D2D1::RectF(0, 0, scr_width, 50.0f), statBrush);
+		Draw->FillRoundedRectangle(D2D1::RoundedRect(b1Rect, 15.0f, 20.0f), b1BckgBrush);
+		Draw->FillRoundedRectangle(D2D1::RoundedRect(b2Rect, 15.0f, 20.0f), b2BckgBrush);
+		Draw->FillRoundedRectangle(D2D1::RoundedRect(b3Rect, 15.0f, 20.0f), b3BckgBrush);
+
+		if (name_set)Draw->DrawTextW(L"ИМЕ НА ИГРАЧ", 13, nrmFormat, b1TxtRect, inactBrush);
+		else
+		{
+			if (!b1Hglt)Draw->DrawTextW(L"ИМЕ НА ИГРАЧ", 13, nrmFormat, b1TxtRect, txtBrush);
+			else Draw->DrawTextW(L"ИМЕ НА ИГРАЧ", 13, nrmFormat, b1TxtRect, hgltBrush);
+		}
+		if (!b2Hglt)Draw->DrawTextW(L"ЗВУЦИ ON / OFF", 15, nrmFormat, b2TxtRect, txtBrush);
+		else Draw->DrawTextW(L"ЗВУЦИ ON / OFF", 15, nrmFormat, b2TxtRect, hgltBrush);
+		if (!b3Hglt)Draw->DrawTextW(L"ПОМОЩ ЗА ИГРАТА", 16, nrmFormat, b3TxtRect, txtBrush);
+		else Draw->DrawTextW(L"ПОМОЩ ЗА ИГРАТА", 16, nrmFormat, b3TxtRect, hgltBrush);
+	}
+	if (inactBrush && midFormat)Draw->DrawTextW(txt, result, midFormat, D2D1::RectF(50.0f, 150.0f, scr_width, scr_height),
+		inactBrush);
+	Draw->EndDraw();
+
+	if (sound)mciSendString(L"play .\\res\\snd\\help.wav", NULL, NULL, NULL);
+}
 
 INT_PTR CALLBACK DlgProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -983,7 +1045,19 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 			}
 			if (LOWORD(lParam) * x_scale >= b3Rect.left && LOWORD(lParam) * x_scale <= b3Rect.right)
 			{
-
+				if (!show_help)
+				{
+					show_help = true;
+					pause = true;
+					ShowHelp();
+					break;
+				}
+				else
+				{
+					show_help = false;
+					pause = false;
+					break;
+				}
 			}
 		}
 		break;
@@ -1076,7 +1150,7 @@ LRESULT CALLBACK WinProc(HWND hwnd, UINT ReceivedMsg, WPARAM wParam, LPARAM lPar
 
 						dll::sort(bEvils, Hero->get_rect());
 
-						if (sound)mciSendString(L"play .\\res\\snd\\shoot.wav", NULL, NULL, NULL);
+						if (sound)mciSendString(L"play .\\res\\snd\\shot.wav", NULL, NULL, NULL);
 						--score;
 						if (score < 0)score = 0;
 
